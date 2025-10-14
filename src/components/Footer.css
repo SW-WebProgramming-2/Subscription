@@ -1,0 +1,285 @@
+/* 푸터 */
+.footer {
+  background: #1f2937;
+  color: white;
+  margin-top: 4rem;
+}
+
+.footerContainer {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 3rem 2rem 0 2rem;
+}
+
+/* 푸터 콘텐츠 */
+.footerContent {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 3rem;
+  margin-bottom: 3rem;
+}
+
+/* 회사 정보 */
+.companyInfo {
+  max-width: 400px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.logo img {
+  width: 40px;
+  height: 40px;
+}
+
+.description {
+  color: #d1d5db;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  font-size: 0.95rem;
+}
+
+.socialLinks {
+  display: flex;
+  gap: 1rem;
+}
+
+.socialLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: #374151;
+  border-radius: 50%;
+  text-decoration: none;
+  font-size: 1.2rem;
+  transition: all 0.3s ease;
+}
+
+.socialLink:hover {
+  background: #4b5563;
+  transform: translateY(-2px);
+}
+
+/* 푸터 섹션 */
+.footerTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: white;
+}
+
+.footerList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.footerList li {
+  margin-bottom: 0.75rem;
+}
+
+.footerLink {
+  color: #d1d5db;
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: color 0.2s;
+}
+
+.footerLink:hover {
+  color: white;
+}
+
+/* 구분선 */
+.footerDivider {
+  height: 1px;
+  background: #374151;
+  margin: 2rem 0;
+}
+
+/* 하단 정보 */
+.footerBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 2rem;
+}
+
+.copyright p {
+  margin: 0.25rem 0;
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+.koreanCopyright {
+  color: #6b7280 !important;
+  font-size: 0.8rem !important;
+}
+
+.footerBadges {
+  display: flex;
+  gap: 1rem;
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #374151;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: #d1d5db;
+}
+
+.badgeIcon {
+  font-size: 1rem;
+}
+
+/* 뉴스레터 */
+.newsletter {
+  background: #374151;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.newsletterContent {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.newsletterTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: white;
+}
+
+.newsletterDescription {
+  color: #d1d5db;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+
+.newsletterForm {
+  display: flex;
+  gap: 1rem;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.newsletterInput {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 1px solid #4b5563;
+  border-radius: 8px;
+  background: #1f2937;
+  color: white;
+  font-size: 0.95rem;
+}
+
+.newsletterInput::placeholder {
+  color: #9ca3af;
+}
+
+.newsletterInput:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.newsletterButton {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.newsletterButton:hover {
+  background: #5a67d8;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 1024px) {
+  .footerContent {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+  
+  .companyInfo {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .footerContainer {
+    padding: 2rem 1rem 0 1rem;
+  }
+  
+  .footerContent {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  
+  .footerBottom {
+    flex-direction: column;
+    gap: 1.5rem;
+    text-align: center;
+  }
+  
+  .footerBadges {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .newsletter {
+    padding: 1.5rem;
+  }
+  
+  .newsletterForm {
+    flex-direction: column;
+    max-width: none;
+  }
+  
+  .newsletterButton {
+    width: 100%;
+  }
+  
+  .socialLinks {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .footerContent {
+    gap: 1.5rem;
+  }
+  
+  .footerTitle {
+    font-size: 1rem;
+  }
+  
+  .newsletterTitle {
+    font-size: 1.25rem;
+  }
+  
+  .badge {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
+  }
+}
