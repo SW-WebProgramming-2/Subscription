@@ -2,7 +2,6 @@
 
 // API 기본 설정
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
-const BANK_API_BASE_URL = process.env.NEXT_PUBLIC_BANK_API_URL || 'https://api.odcloud.kr/api';
 
 // HTTP 클라이언트
 class ApiClient {
@@ -67,7 +66,6 @@ class ApiClient {
 
 // API 클라이언트 인스턴스
 export const apiClient = new ApiClient(API_BASE_URL);
-export const bankApiClient = new ApiClient(BANK_API_BASE_URL);
 
 // 인증 관련 API
 export const authAPI = {
@@ -129,45 +127,6 @@ export const subscriptionAPI = {
   // 카테고리별 구독 서비스
   getSubscriptionsByCategory: (category) =>
     apiClient.get(`/subscriptions/category/${category}`),
-};
-
-// 오픈뱅킹 API 연동
-export const openBankingAPI = {
-  // 은행 목록 조회
-  getBanks: () =>
-    bankApiClient.get('/banks'),
-
-  // 계좌 목록 조회
-  getAccounts: (userId) =>
-    apiClient.get(`/banking/accounts?userId=${userId}`),
-
-  // 거래내역 조회 (구독 서비스 자동 인식용)
-  getTransactions: (accountId, startDate, endDate) =>
-    apiClient.get(`/banking/accounts/${accountId}/transactions`, {
-      params: { startDate, endDate }
-    }),
-
-  // 구독 서비스 자동 인식
-  detectSubscriptions: (transactions) =>
-    apiClient.post('/banking/detect-subscriptions', { transactions }),
-
-  // 카드사 연동
-  getCards: (userId) =>
-    apiClient.get(`/banking/cards?userId=${userId}`),
-
-  // 카드 결제내역 조회
-  getCardTransactions: (cardId, startDate, endDate) =>
-    apiClient.get(`/banking/cards/${cardId}/transactions`, {
-      params: { startDate, endDate }
-    }),
-
-  // 계좌/카드 연결
-  connectAccount: (accountData) =>
-    apiClient.post('/banking/connect-account', accountData),
-
-  // 계좌/카드 연결 해제
-  disconnectAccount: (accountId) =>
-    apiClient.delete(`/banking/accounts/${accountId}`),
 };
 
 // AI 추천 관련 API
@@ -375,7 +334,6 @@ export const storage = {
 export default {
   authAPI,
   subscriptionAPI,
-  openBankingAPI,
   recommendationAPI,
   analyticsAPI,
   notificationAPI,

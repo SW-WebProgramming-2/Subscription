@@ -1,0 +1,14 @@
+localhost {
+  encode gzip
+  
+  # Django API 라우팅
+  handle /api/* {
+    reverse_proxy django:8000
+  }
+  
+  # Next.js 프론트엔드
+  handle {
+    reverse_proxy app:3000
+  }
+}
+

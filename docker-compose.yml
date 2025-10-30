@@ -1,14 +1,20 @@
-version: '3.8'
-
 services:
-  subscription-manager:
+  app:
     build: .
-    ports:
-      - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
+    container_name: subscription-app
     environment:
       - NODE_ENV=development
-    command: npm run dev
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - django
 
+  django:
+    build: ./backend-django
+    container_name: subscription-django
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-dev-secret-key}
+      - DJANGO_DEBUG=True
+    ports:
+      - "8000:8000"
