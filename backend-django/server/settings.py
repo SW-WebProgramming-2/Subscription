@@ -14,7 +14,14 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-dev-key-change
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['*']
+# ALLOWED_HOSTS 설정
+# Railway 배포 도메인 포함
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',') if os.environ.get('ALLOWED_HOSTS') else [
+    '*',
+    'subscription-production-2c3d.up.railway.app',
+    'localhost',
+    '127.0.0.1',
+]
 
 # Application definition
 INSTALLED_APPS = [
@@ -96,8 +103,15 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True
+# 프로덕션에서는 특정 도메인만 허용하는 것을 권장
+CORS_ALLOW_ALL_ORIGINS = True  # 개발용, 프로덕션에서는 False로 변경
 CORS_ALLOW_CREDENTIALS = True
+
+# 프로덕션 환경에서는 아래 주석을 해제하고 위를 False로 변경
+# CORS_ALLOWED_ORIGINS = [
+#     "https://your-frontend-domain.vercel.app",
+#     "https://your-frontend-domain.railway.app",
+# ]
 
 # REST Framework settings
 REST_FRAMEWORK = {

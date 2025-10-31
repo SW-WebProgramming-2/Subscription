@@ -1,0 +1,16 @@
+# Railway 배포 시 제외할 파일들
+node_modules/
+.next/
+.git/
+backend-django/
+*.log
+.env.local
+.env.development
+.env.test
+Dockerfile.dev
+docker-compose.yml
+docker-compose.prod.yml
+Caddyfile
+README.md
+DEPLOY_GUIDE.md
+

@@ -1,22 +1,19 @@
-# 개발용 Docker Compose 설정
+# 프로덕션용 Docker Compose 설정
 version: '3.8'
 
 services:
   # Next.js 프론트엔드
-  app:
+  nextjs:
     build:
       context: .
-      dockerfile: Dockerfile.dev
-    container_name: subscription-app
+      dockerfile: Dockerfile
+    container_name: subscription-nextjs
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - PORT=3000
-      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+      - NEXT_PUBLIC_API_URL=http://django:8000/api
     ports:
       - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
     depends_on:
       - django
     restart: unless-stopped
@@ -28,11 +25,16 @@ services:
       dockerfile: Dockerfile
     container_name: subscription-django
     environment:
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-dev-secret-key}
-      - DJANGO_DEBUG=True
-      - ALLOWED_HOSTS=*
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DJANGO_DEBUG=False
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///db.sqlite3}
     ports:
       - "8000:8000"
     volumes:
-      - ./backend-django:/app
+      - django_data:/app/db
     restart: unless-stopped
+
+volumes:
+  django_data:
+

@@ -1,0 +1,15 @@
+# 개발용 Dockerfile (기존 내용 유지)
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]
+

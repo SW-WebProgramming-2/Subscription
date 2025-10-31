@@ -1,7 +1,12 @@
 // API 통신 및 데이터 관리 유틸리티
 
 // API 기본 설정
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+// 프로덕션: Railway 배포 URL 사용
+// 개발: localhost 사용
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 
+  (process.env.NODE_ENV === 'production' 
+    ? 'https://subscription-production-2c3d.up.railway.app/api'
+    : 'http://localhost:8000/api');
 
 // HTTP 클라이언트
 class ApiClient {
@@ -331,6 +336,34 @@ export const storage = {
   }
 };
 
+// 오픈뱅킹 관련 API
+export const openbankingAPI = {
+  // 인증 URL 가져오기
+  getAuthorizationUrl: (state) =>
+    apiClient.post('/openbanking/auth-url/', { state }),
+
+  // 인증 코드를 토큰으로 교환
+  exchangeToken: (authorizationCode) =>
+    apiClient.post('/openbanking/token/', { code: authorizationCode }),
+
+  // 계좌 목록 조회
+  getAccounts: (accessToken, userSeqNo) =>
+    apiClient.post('/openbanking/accounts/', {
+      access_token: accessToken,
+      user_seq_no: userSeqNo
+    }),
+
+  // 거래 내역 조회 (구독 결제 확인용)
+  getTransactions: (accessToken, fintechUseNum, bankTranId, fromDate, toDate) =>
+    apiClient.post('/openbanking/transactions/', {
+      access_token: accessToken,
+      fintech_use_num: fintechUseNum,
+      bank_tran_id: bankTranId,
+      from_date: fromDate,
+      to_date: toDate
+    }),
+};
+
 export default {
   authAPI,
   subscriptionAPI,
@@ -340,6 +373,7 @@ export default {
   userAPI,
   calendarAPI,
   fileAPI,
+  openbankingAPI,
   handleApiError,
   validateApiResponse,
   storage
