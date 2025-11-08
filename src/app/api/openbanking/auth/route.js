@@ -2,11 +2,24 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    const { bankCode, redirectUri } = await request.json();
+    let requestBody;
+    try {
+      requestBody = await request.json();
+    } catch (e) {
+      return NextResponse.json(
+        { error: '요청 본문을 파싱할 수 없습니다.', details: e.message },
+        { status: 400 }
+      );
+    }
+
+    const { bankCode, redirectUri } = requestBody;
 
     if (!bankCode || !redirectUri) {
       return NextResponse.json(
-        { error: '은행 코드와 리다이렉트 URI가 필요합니다.' },
+        { 
+          error: '은행 코드와 리다이렉트 URI가 필요합니다.',
+          received: { bankCode: !!bankCode, redirectUri: !!redirectUri }
+        },
         { status: 400 }
       );
     }
@@ -64,7 +77,11 @@ export async function POST(request) {
   } catch (error) {
     console.error('오픈뱅킹 인증 URL 생성 오류:', error);
     return NextResponse.json(
-      { error: '오픈뱅킹 인증 URL 생성 중 오류가 발생했습니다.' },
+      { 
+        error: '오픈뱅킹 인증 URL 생성 중 오류가 발생했습니다.',
+        details: error.message || '알 수 없는 오류',
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 500 }
     );
   }

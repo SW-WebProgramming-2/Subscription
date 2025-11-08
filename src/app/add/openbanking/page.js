@@ -102,7 +102,8 @@ export default function OpenBankingPage() {
       window.location.href = authUrl;
     } catch (error) {
       console.error('오픈뱅킹 인증 오류:', error);
-      alert('오픈뱅킹 인증 중 오류가 발생했습니다.');
+      const errorMessage = error.message || '오픈뱅킹 인증 중 오류가 발생했습니다.';
+      alert(`오픈뱅킹 인증 오류: ${errorMessage}\n\n자세한 내용은 브라우저 콘솔을 확인해주세요.`);
       setIsLoading(false);
     }
   };
@@ -128,10 +129,26 @@ export default function OpenBankingPage() {
     });
 
     if (!response.ok) {
-      throw new Error('오픈뱅킹 인증 URL 생성 실패');
+      // 에러 응답의 상세 정보 확인
+      let errorMessage = '오픈뱅킹 인증 URL 생성 실패';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+        console.error('API 에러 응답:', errorData);
+      } catch (e) {
+        const errorText = await response.text();
+        console.error('API 에러 응답 (텍스트):', errorText);
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(`${errorMessage} (상태 코드: ${response.status})`);
     }
 
     const data = await response.json();
+    
+    if (!data.authUrl) {
+      throw new Error('인증 URL이 응답에 포함되지 않았습니다.');
+    }
+    
     return data.authUrl;
   };
 
