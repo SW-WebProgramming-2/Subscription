@@ -99,7 +99,7 @@ export default function Home() {
               justifyContent: 'center',
               flexWrap: 'wrap'
             }}>
-              <button style={{
+              <a href="/add/openbanking" style={{
                 background: '#ff6b6b',
                 color: 'white',
                 border: 'none',
@@ -107,10 +107,12 @@ export default function Home() {
                 borderRadius: '50px',
                 fontSize: '1.1rem',
                 fontWeight: '600',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'inline-block'
               }}>
                 구독 추가하기
-              </button>
+              </a>
               <button style={{
                 background: 'transparent',
                 color: 'white',
@@ -174,17 +176,19 @@ export default function Home() {
         <section style={{ marginBottom: '3rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h2 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>내 구독 서비스</h2>
-            <button style={{
+            <a href="/add/openbanking" style={{
               background: '#667eea',
               color: 'white',
               border: 'none',
               padding: '0.75rem 1.5rem',
               borderRadius: '8px',
               fontWeight: '600',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              textDecoration: 'none',
+              display: 'inline-block'
             }}>
               + 구독 추가
-            </button>
+            </a>
           </div>
           
           <div style={{
