@@ -18,19 +18,41 @@ export async function POST(request) {
     // 3. state 파라미터 생성 (CSRF 방지)
 
     const state = generateRandomString(32);
-    const clientId = process.env.OPENBANKING_CLIENT_ID || 'test_client_id';
+    const clientId = process.env.OPENBANKING_CLIENT_ID;
+    
+    if (!clientId) {
+      return NextResponse.json(
+        { error: 'OPENBANKING_CLIENT_ID 환경 변수가 설정되지 않았습니다.' },
+        { status: 500 }
+      );
+    }
+    
+    // bank_tran_id 생성 (오픈뱅킹 API 요구사항: 고유한 거래번호)
+    const bankTranId = generateBankTranId();
     
     // 오픈뱅킹 인증 URL 생성
-    // 실제 구현 시 한국금융결제원 오픈뱅킹 API 엔드포인트 사용
-    const authUrl = `https://testapi.openbanking.or.kr/oauth/2.0/authorize?` +
-      `response_type=code&` +
-      `client_id=${clientId}&` +
-      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `scope=login inquiry transfer&` +
-      `state=${state}&` +
-      `auth_type=0&` +
-      `bank_tran_id=${generateBankTranId()}&` +
-      `bank_code_std=${bankCode}`;
+    // 오픈뱅킹 API 스펙에 맞게 파라미터 구성
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope: 'login inquiry transfer', // 공백으로 구분된 scope
+      state: state,
+      auth_type: '0', // 최초인증
+      bank_tran_id: bankTranId,
+      bank_code_std: bankCode
+    });
+    
+    const authUrl = `https://testapi.openbanking.or.kr/oauth/2.0/authorize?${params.toString()}`;
+
+    // 디버깅용 로그 (프로덕션에서는 제거)
+    console.log('오픈뱅킹 인증 URL 생성:', {
+      clientId: clientId.substring(0, 10) + '...', // 일부만 표시
+      redirectUri,
+      bankCode,
+      bankTranId,
+      state: state.substring(0, 10) + '...'
+    });
 
     // state를 세션에 저장 (실제로는 Redis 등 사용)
     // 여기서는 간단히 응답에 포함
@@ -59,9 +81,13 @@ function generateRandomString(length) {
 }
 
 // 은행 거래 ID 생성 (오픈뱅킹 API 요구사항)
+// 형식: F{숫자9자리}{랜덤문자10자리} 또는 M{숫자9자리}U{타임스탬프}{랜덤문자9자리}
 function generateBankTranId() {
   const timestamp = Date.now();
-  const random = generateRandomString(9);
-  return `M202400000U${timestamp}${random}`;
+  const random = generateRandomString(10);
+  // 오픈뱅킹 API 요구 형식: 최대 20자, 영문자와 숫자 조합
+  // 형식: F{9자리숫자}{10자리랜덤문자}
+  const randomNum = Math.floor(100000000 + Math.random() * 900000000); // 9자리 숫자
+  return `F${randomNum}${random}`;
 }
 
