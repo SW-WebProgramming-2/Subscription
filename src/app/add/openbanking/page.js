@@ -502,21 +502,47 @@ export default function OpenBankingPage() {
         </section>
 
         {/* 거래 내역 섹션 */}
-        {selectedAccount && transactions.length > 0 && (
+        {selectedAccount && (
           <section style={{ marginBottom: '2rem' }}>
-            <h2 style={{
-              fontSize: '1.25rem',
-              fontWeight: '600',
-              color: '#1f2937',
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
               marginBottom: '1rem'
             }}>
-              2. 최근 거래 내역
-            </h2>
+              <h2 style={{
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                color: '#1f2937',
+                margin: 0
+              }}>
+                2. 최근 거래 내역
+              </h2>
+              {accessToken && userSeqNo && (
+                <button
+                  onClick={() => fetchTransactions(selectedAccount)}
+                  disabled={isLoadingTransactions}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: isLoadingTransactions ? '#d1d5db' : '#667eea',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: isLoadingTransactions ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isLoadingTransactions ? '조회 중...' : '거래 내역 조회'}
+                </button>
+              )}
+            </div>
+            
             {isLoadingTransactions ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
                 거래 내역 조회 중...
               </div>
-            ) : (
+            ) : transactions.length > 0 ? (
               <div style={{
                 background: '#f9fafb',
                 borderRadius: '8px',
@@ -558,6 +584,18 @@ export default function OpenBankingPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            ) : (
+              <div style={{
+                background: '#f9fafb',
+                borderRadius: '8px',
+                padding: '2rem',
+                textAlign: 'center',
+                color: '#6b7280'
+              }}>
+                {accessToken && userSeqNo 
+                  ? '거래 내역이 없거나 조회되지 않았습니다. 위의 "거래 내역 조회" 버튼을 클릭하세요.'
+                  : '거래 내역을 조회하려면 오픈뱅킹 인증이 필요합니다.'}
               </div>
             )}
           </section>
