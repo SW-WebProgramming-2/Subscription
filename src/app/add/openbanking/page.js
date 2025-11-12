@@ -9,6 +9,10 @@ export default function OpenBankingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [accounts, setAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState(null);
+  const [accessToken, setAccessToken] = useState(null);
+  const [userSeqNo, setUserSeqNo] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
   const [subscriptionInfo, setSubscriptionInfo] = useState({
     name: '',
     price: '',
@@ -19,6 +23,9 @@ export default function OpenBankingPage() {
   // 컴포넌트 마운트 시 세션 스토리지에서 계좌 정보 불러오기
   useEffect(() => {
     const savedAccounts = sessionStorage.getItem('openbankingAccounts');
+    const savedToken = sessionStorage.getItem('openbankingAccessToken');
+    const savedUserSeqNo = sessionStorage.getItem('openbankingUserSeqNo');
+    
     if (savedAccounts) {
       try {
         const accounts = JSON.parse(savedAccounts);
@@ -32,7 +39,135 @@ export default function OpenBankingPage() {
         console.error('계좌 정보 파싱 오류:', error);
       }
     }
+    
+    if (savedToken) {
+      setAccessToken(savedToken);
+      sessionStorage.removeItem('openbankingAccessToken');
+    }
+    
+    if (savedUserSeqNo) {
+      setUserSeqNo(savedUserSeqNo);
+      sessionStorage.removeItem('openbankingUserSeqNo');
+    }
   }, []);
+
+  // 계좌 선택 시 거래 내역 조회
+  const handleAccountSelect = async (account) => {
+    setSelectedAccount(account);
+    
+    // 거래 내역 자동 조회
+    if (accessToken && userSeqNo) {
+      await fetchTransactions(account);
+    }
+  };
+
+  // 거래 내역 조회
+  const fetchTransactions = async (account) => {
+    if (!accessToken || !userSeqNo) {
+      console.warn('인증 정보가 없어 거래 내역을 조회할 수 없습니다.');
+      return;
+    }
+
+    setIsLoadingTransactions(true);
+
+    try {
+      const response = await fetch('/api/openbanking/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          accountId: account.accountId,
+          accessToken: accessToken,
+          userSeqNo: userSeqNo,
+          bankCode: account.bankCode
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('거래 내역 조회 실패');
+      }
+
+      const data = await response.json();
+      setTransactions(data.transactions || []);
+      
+      // 거래 내역에서 구독 서비스 자동 감지
+      detectSubscriptionFromTransactions(data.transactions || []);
+    } catch (error) {
+      console.error('거래 내역 조회 오류:', error);
+      // 에러가 발생해도 계속 진행 (거래 내역 없이도 구독 추가 가능)
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  };
+
+  // 거래 내역에서 구독 서비스 자동 감지
+  const detectSubscriptionFromTransactions = (transactions) => {
+    // 구독 서비스로 알려진 키워드 목록
+    const subscriptionKeywords = [
+      'netflix', 'spotify', 'youtube', 'disney', 'apple', 'google',
+      'microsoft', 'amazon', 'prime', 'disney+', 'netflix',
+      '넷플릭스', '스포티파이', '유튜브', '디즈니', '애플', '구글',
+      '마이크로소프트', '아마존', '프라임'
+    ];
+
+    // 반복되는 거래 찾기 (구독 서비스는 정기적으로 결제됨)
+    const recurringTransactions = transactions
+      .filter(t => t.type === '출금' && t.amount > 0)
+      .map(t => ({
+        ...t,
+        description: t.description.toLowerCase()
+      }))
+      .filter(t => 
+        subscriptionKeywords.some(keyword => 
+          t.description.includes(keyword.toLowerCase())
+        )
+      );
+
+    if (recurringTransactions.length > 0) {
+      // 가장 최근 거래를 기본값으로 설정
+      const latestTransaction = recurringTransactions[0];
+      const serviceName = extractServiceName(latestTransaction.description);
+      
+      setSubscriptionInfo(prev => ({
+        ...prev,
+        name: serviceName || prev.name,
+        price: latestTransaction.amount.toString() || prev.price
+      }));
+    }
+  };
+
+  // 거래 내역 설명에서 서비스명 추출
+  const extractServiceName = (description) => {
+    const serviceMap = {
+      'netflix': 'Netflix',
+      '넷플릭스': 'Netflix',
+      'spotify': 'Spotify',
+      '스포티파이': 'Spotify',
+      'youtube': 'YouTube Premium',
+      '유튜브': 'YouTube Premium',
+      'disney': 'Disney+',
+      '디즈니': 'Disney+',
+      'apple': 'Apple',
+      '애플': 'Apple',
+      'google': 'Google',
+      '구글': 'Google',
+      'microsoft': 'Microsoft',
+      '마이크로소프트': 'Microsoft',
+      'amazon': 'Amazon Prime',
+      '아마존': 'Amazon Prime',
+      'prime': 'Amazon Prime'
+    };
+
+    for (const [key, value] of Object.entries(serviceMap)) {
+      if (description.includes(key)) {
+        return value;
+      }
+    }
+
+    // 매칭되지 않으면 원본 설명 반환 (처리된 형태)
+    return description.split(' ')[0] || '';
+  };
 
   // 한국 주요 은행 목록
   const banks = [
@@ -318,7 +453,7 @@ export default function OpenBankingPage() {
                 {accounts.map(account => (
                   <div
                     key={account.accountId}
-                    onClick={() => setSelectedAccount(account)}
+                    onClick={() => handleAccountSelect(account)}
                     style={{
                       padding: '1rem',
                       border: selectedAccount?.accountId === account.accountId 
@@ -366,6 +501,68 @@ export default function OpenBankingPage() {
           )}
         </section>
 
+        {/* 거래 내역 섹션 */}
+        {selectedAccount && transactions.length > 0 && (
+          <section style={{ marginBottom: '2rem' }}>
+            <h2 style={{
+              fontSize: '1.25rem',
+              fontWeight: '600',
+              color: '#1f2937',
+              marginBottom: '1rem'
+            }}>
+              2. 최근 거래 내역
+            </h2>
+            {isLoadingTransactions ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                거래 내역 조회 중...
+              </div>
+            ) : (
+              <div style={{
+                background: '#f9fafb',
+                borderRadius: '8px',
+                padding: '1rem',
+                maxHeight: '300px',
+                overflowY: 'auto'
+              }}>
+                {transactions.slice(0, 10).map((transaction, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '0.75rem',
+                      borderBottom: index < Math.min(transactions.length, 10) - 1 ? '1px solid #e5e7eb' : 'none'
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        fontWeight: '500',
+                        color: '#1f2937',
+                        marginBottom: '0.25rem'
+                      }}>
+                        {transaction.description || '거래 내역'}
+                      </div>
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: '#6b7280'
+                      }}>
+                        {transaction.date ? `${transaction.date.substring(0, 4)}-${transaction.date.substring(4, 6)}-${transaction.date.substring(6, 8)}` : ''}
+                      </div>
+                    </div>
+                    <div style={{
+                      fontWeight: '600',
+                      color: transaction.type === '입금' ? '#10b981' : '#ef4444'
+                    }}>
+                      {transaction.type === '입금' ? '+' : '-'}{transaction.amount.toLocaleString()}원
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* 구독 정보 입력 섹션 */}
         {selectedAccount && (
           <section style={{ marginBottom: '2rem' }}>
@@ -375,7 +572,7 @@ export default function OpenBankingPage() {
               color: '#1f2937',
               marginBottom: '1rem'
             }}>
-              2. 구독 서비스 정보 입력
+              {transactions.length > 0 ? '3. 구독 서비스 정보 입력' : '2. 구독 서비스 정보 입력'}
             </h2>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

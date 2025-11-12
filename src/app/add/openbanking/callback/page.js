@@ -44,8 +44,14 @@ export default function OpenBankingCallback() {
 
       const data = await response.json();
       
-      // 계좌 정보를 세션 스토리지에 저장하고 원래 페이지로 돌아감
+      // 계좌 정보와 인증 정보를 세션 스토리지에 저장
       sessionStorage.setItem('openbankingAccounts', JSON.stringify(data.accounts));
+      if (data.accessToken) {
+        sessionStorage.setItem('openbankingAccessToken', data.accessToken);
+      }
+      if (data.userSeqNo) {
+        sessionStorage.setItem('openbankingUserSeqNo', data.userSeqNo);
+      }
       setStatus('success');
       
       setTimeout(() => {

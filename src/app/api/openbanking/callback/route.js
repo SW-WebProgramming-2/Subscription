@@ -64,7 +64,8 @@ export async function POST(request) {
 
         return NextResponse.json({
           accounts: mockAccounts,
-          accessToken: 'mock_access_token'
+          accessToken: 'mock_access_token',
+          userSeqNo: 'mock_user_seq_no'
         });
       }
 
@@ -109,7 +110,8 @@ export async function POST(request) {
 
     return NextResponse.json({
       accounts,
-      accessToken
+      accessToken,
+      userSeqNo
     });
   } catch (error) {
     console.error('오픈뱅킹 콜백 처리 오류:', error);
