@@ -20,6 +20,16 @@ export default function OpenBankingPage() {
     category: ''
   });
 
+  // 계좌 선택 시 거래 내역 조회
+  const handleAccountSelect = async (account) => {
+    setSelectedAccount(account);
+    
+    // 거래 내역 자동 조회
+    if (accessToken && userSeqNo) {
+      await fetchTransactions(account);
+    }
+  };
+
   // 컴포넌트 마운트 시 세션 스토리지에서 계좌 정보 불러오기
   useEffect(() => {
     const savedAccounts = sessionStorage.getItem('openbankingAccounts');
@@ -51,15 +61,13 @@ export default function OpenBankingPage() {
     }
   }, []);
 
-  // 계좌 선택 시 거래 내역 조회
-  const handleAccountSelect = async (account) => {
-    setSelectedAccount(account);
-    
-    // 거래 내역 자동 조회
-    if (accessToken && userSeqNo) {
-      await fetchTransactions(account);
+  // 계좌 목록과 인증 정보가 모두 로드되면 첫 번째 계좌 자동 선택
+  useEffect(() => {
+    if (accounts.length > 0 && accessToken && userSeqNo && !selectedAccount) {
+      const firstAccount = accounts[0];
+      handleAccountSelect(firstAccount);
     }
-  };
+  }, [accounts, accessToken, userSeqNo]);
 
   // 거래 내역 조회
   const fetchTransactions = async (account) => {
@@ -447,8 +455,21 @@ export default function OpenBankingPage() {
                 color: '#374151',
                 marginBottom: '0.5rem'
               }}>
-                계좌 선택
+                계좌 선택 {selectedAccount && <span style={{ color: '#10b981', fontSize: '0.75rem' }}>✓ 선택됨</span>}
               </label>
+              {!selectedAccount && (
+                <div style={{
+                  background: '#fef3c7',
+                  border: '1px solid #fbbf24',
+                  borderRadius: '6px',
+                  padding: '0.75rem',
+                  marginBottom: '0.75rem',
+                  fontSize: '0.875rem',
+                  color: '#92400e'
+                }}>
+                  💡 아래 계좌를 클릭하면 거래 내역이 자동으로 조회됩니다.
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {accounts.map(account => (
                   <div
