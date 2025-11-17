@@ -1,0 +1,170 @@
+# Caddy Reverse Proxy 설정
+# HTTPS 자동 지원 (Let's Encrypt)
+# 
+# 사용 방법:
+# 1. 도메인 설정: example.com을 실제 도메인으로 변경
+# 2. Docker Compose에서 Caddy 서비스에 이 파일 마운트
+# 3. Caddy가 자동으로 HTTPS 인증서 발급 및 갱신
+
+# 프로덕션 도메인 (실제 도메인으로 변경 필요)
+# 예: subscription.example.com
+{
+    # 전역 설정
+    email your-email@example.com  # Let's Encrypt 인증서 갱신 알림용 이메일
+    auto_https off  # 개발 환경에서는 off, 프로덕션에서는 on
+}
+
+# 개발 환경 (localhost)
+localhost {
+    # Gzip 압축
+    encode gzip
+    
+    # CORS 헤더 (개발용)
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, Authorization"
+    }
+    
+    # Django API 프록시
+    handle /api/* {
+        reverse_proxy backend:8000 {
+            # 헤더 전달
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+            
+            # 헬스체크
+            health_uri /api/health/
+            health_interval 10s
+            health_timeout 5s
+        }
+    }
+    
+    # Django Admin 프록시
+    handle /admin/* {
+        reverse_proxy backend:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+    
+    # Django API 문서 (Swagger)
+    handle /api/docs/* {
+        reverse_proxy backend:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+    
+    # Django API 스키마
+    handle /api/schema/* {
+        reverse_proxy backend:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+    
+    # 정적 파일 (Django collectstatic)
+    handle /static/* {
+        root * /app/staticfiles
+        file_server
+    }
+    
+    # 미디어 파일 (업로드된 파일)
+    handle /media/* {
+        root * /app/media
+        file_server
+    }
+    
+    # 기본 라우팅 (Next.js 프론트엔드 또는 기타)
+    handle {
+        reverse_proxy app:3000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+}
+
+# 프로덕션 환경 (실제 도메인)
+# 주석을 해제하고 도메인을 변경하여 사용
+# subscription.example.com {
+#     # Gzip 압축
+#     encode gzip
+#     
+#     # 보안 헤더
+#     header {
+#         # HSTS (HTTPS 강제)
+#         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+#         
+#         # XSS 보호
+#         X-Content-Type-Options "nosniff"
+#         X-Frame-Options "DENY"
+#         X-XSS-Protection "1; mode=block"
+#         
+#         # Referrer 정책
+#         Referrer-Policy "strict-origin-when-cross-origin"
+#         
+#         # Content Security Policy (필요에 따라 조정)
+#         Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
+#     }
+#     
+#     # Django API 프록시
+#     handle /api/* {
+#         reverse_proxy backend:8000 {
+#             header_up Host {host}
+#             header_up X-Real-IP {remote}
+#             header_up X-Forwarded-For {remote}
+#             header_up X-Forwarded-Proto https
+#             
+#             # 헬스체크
+#             health_uri /api/health/
+#             health_interval 10s
+#             health_timeout 5s
+#         }
+#     }
+#     
+#     # Django Admin 프록시
+#     handle /admin/* {
+#         reverse_proxy backend:8000 {
+#             header_up Host {host}
+#             header_up X-Real-IP {remote}
+#             header_up X-Forwarded-For {remote}
+#             header_up X-Forwarded-Proto https
+#         }
+#     }
+#     
+#     # 정적 파일
+#     handle /static/* {
+#         root * /app/staticfiles
+#         file_server
+#         header Cache-Control "public, max-age=31536000, immutable"
+#     }
+#     
+#     # 미디어 파일
+#     handle /media/* {
+#         root * /app/media
+#         file_server
+#         header Cache-Control "public, max-age=3600"
+#     }
+#     
+#     # 기본 라우팅 (Next.js 프론트엔드)
+#     handle {
+#         reverse_proxy app:3000 {
+#             header_up Host {host}
+#             header_up X-Real-IP {remote}
+#             header_up X-Forwarded-For {remote}
+#             header_up X-Forwarded-Proto https
+#         }
+#     }
+# }
+
