@@ -37,70 +37,70 @@
 
 #### 기본 보안 기능:
 - **토큰 암호화/복호화** (AES-256-GCM)
-  - `encryptToken()`: 토큰 암호화
-  - `decryptToken()`: 토큰 복호화
-  - `serializeEncryptedToken()`: 암호화된 토큰 직렬화
-  - `deserializeEncryptedToken()`: 암호화된 토큰 역직렬화
+    - `encryptToken()`: 토큰 암호화
+    - `decryptToken()`: 토큰 복호화
+    - `serializeEncryptedToken()`: 암호화된 토큰 직렬화
+    - `deserializeEncryptedToken()`: 암호화된 토큰 역직렬화
 
 - **보안 헤더 생성**
-  - `getSecurityHeaders()`: XSS, 클릭재킹, CSP 등 보안 헤더 제공
+    - `getSecurityHeaders()`: XSS, 클릭재킹, CSP 등 보안 헤더 제공
 
 - **Origin 검증**
-  - `validateOrigin()`: CORS 공격 방지
+    - `validateOrigin()`: CORS 공격 방지
 
 - **요청 크기 제한**
-  - `validateRequestSize()`: DoS 공격 방지
+    - `validateRequestSize()`: DoS 공격 방지
 
 #### 추가 보안 기능:
 - **감사 로그 (Audit Logging)**
-  - `auditLog()`: 모든 금융 API 접근 기록
-  - `getAuditLogs()`: 감사 로그 조회
-  - 민감 정보 제외하고 로깅
-  - 보안 이벤트 추적
+    - `auditLog()`: 모든 금융 API 접근 기록
+    - `getAuditLogs()`: 감사 로그 조회
+    - 민감 정보 제외하고 로깅
+    - 보안 이벤트 추적
 
 - **Replay Attack 방지**
-  - `generateNonce()`: Nonce 생성
-  - `verifyNonce()`: Nonce 검증
-  - `validateTimestamp()`: 타임스탬프 검증
-  - 중복 요청 방지
+    - `generateNonce()`: Nonce 생성
+    - `verifyNonce()`: Nonce 검증
+    - `validateTimestamp()`: 타임스탬프 검증
+    - 중복 요청 방지
 
 - **IP 화이트리스트/블랙리스트**
-  - `isIpWhitelisted()`: IP 화이트리스트 검증
-  - `isIpBlacklisted()`: IP 블랙리스트 검증
-  - 환경 변수로 관리
-  - CIDR 표기법 지원
+    - `isIpWhitelisted()`: IP 화이트리스트 검증
+    - `isIpBlacklisted()`: IP 블랙리스트 검증
+    - 환경 변수로 관리
+    - CIDR 표기법 지원
 
 - **비정상 행위 탐지**
-  - `detectSuspiciousActivity()`: 비정상 행위 감지
-  - `getSuspiciousIps()`: 의심스러운 IP 조회
-  - 실패 횟수 추적
-  - 자동 알림 (감사 로그)
+    - `detectSuspiciousActivity()`: 비정상 행위 감지
+    - `getSuspiciousIps()`: 의심스러운 IP 조회
+    - 실패 횟수 추적
+    - 자동 알림 (감사 로그)
 
 - **요청 ID 추적**
-  - `generateRequestId()`: 고유 요청 ID 생성
-  - 각 요청에 고유 ID 부여
-  - 디버깅 및 추적 용이
-  - 응답 헤더에 포함
+    - `generateRequestId()`: 고유 요청 ID 생성
+    - 각 요청에 고유 ID 부여
+    - 디버깅 및 추적 용이
+    - 응답 헤더에 포함
 
 - **토큰 만료 시간 검증**
-  - `validateTokenExpiry()`: 토큰 유효기간 검증
-  - 만료된 토큰 자동 거부
-  - 최대 24시간 제한
+    - `validateTokenExpiry()`: 토큰 유효기간 검증
+    - 만료된 토큰 자동 거부
+    - 최대 24시간 제한
 
 - **요청 서명 검증**
-  - `signRequest()`: HMAC 서명 생성
-  - `verifyRequestSignature()`: 서명 검증
-  - 요청 무결성 검증
-  - 변조된 요청 차단
+    - `signRequest()`: HMAC 서명 생성
+    - `verifyRequestSignature()`: 서명 검증
+    - 요청 무결성 검증
+    - 변조된 요청 차단
 
 - **요청 타임아웃 설정**
-  - `fetchWithTimeout()`: 타임아웃이 있는 fetch 래퍼
-  - 오래 걸리는 요청 차단
-  - DoS 공격 완화
+    - `fetchWithTimeout()`: 타임아웃이 있는 fetch 래퍼
+    - 오래 걸리는 요청 차단
+    - DoS 공격 완화
 
 - **메모리 보안**
-  - `clearSensitiveData()`: 민감 정보 제거
-  - 메모리 누수 방지
+    - `clearSensitiveData()`: 민감 정보 제거
+    - 메모리 누수 방지
 
 ### 2. API 라우트 보안 강화
 
@@ -129,7 +129,7 @@
 - ✅ 요청 ID 추적
 - ✅ 비정상 행위 탐지
 
-**주의사항**: 
+**주의사항**:
 - 토큰 암호화는 기본적으로 비활성화되어 있어 기존 코드와 호환됩니다
 - `ENCRYPT_TOKEN=true` 설정 시 토큰을 암호화하여 반환
 - 복호화가 필요한 경우 `decryptToken()` 함수 사용 필요
@@ -206,26 +206,26 @@ ALLOWED_REDIRECT_DOMAINS=yourdomain.com
 ## 📝 테스트 권장사항
 
 1. **인증 플로우 테스트**
-   - Origin 검증이 정상 작동하는지 확인
-   - 요청 크기 제한이 적용되는지 확인
-   - IP 화이트리스트/블랙리스트가 작동하는지 확인
+    - Origin 검증이 정상 작동하는지 확인
+    - 요청 크기 제한이 적용되는지 확인
+    - IP 화이트리스트/블랙리스트가 작동하는지 확인
 
 2. **토큰 암호화/복호화 테스트**
-   - 암호화된 토큰이 정상적으로 저장/전송되는지 확인
-   - 복호화가 정상적으로 작동하는지 확인
-   - 토큰 만료 시간 검증이 작동하는지 확인
+    - 암호화된 토큰이 정상적으로 저장/전송되는지 확인
+    - 복호화가 정상적으로 작동하는지 확인
+    - 토큰 만료 시간 검증이 작동하는지 확인
 
 3. **보안 헤더 확인**
-   - 응답 헤더에 보안 헤더가 포함되는지 확인
-   - 요청 ID가 응답 헤더에 포함되는지 확인
+    - 응답 헤더에 보안 헤더가 포함되는지 확인
+    - 요청 ID가 응답 헤더에 포함되는지 확인
 
 4. **감사 로그 테스트**
-   - 모든 주요 이벤트가 로그에 기록되는지 확인
-   - 민감 정보가 로그에 포함되지 않는지 확인
+    - 모든 주요 이벤트가 로그에 기록되는지 확인
+    - 민감 정보가 로그에 포함되지 않는지 확인
 
 5. **비정상 행위 탐지 테스트**
-   - 여러 번 실패 시 의심스러운 활동으로 감지되는지 확인
-   - 감사 로그에 기록되는지 확인
+    - 여러 번 실패 시 의심스러운 활동으로 감지되는지 확인
+    - 감사 로그에 기록되는지 확인
 
 ## 🛡️ 공격 유형별 방어
 
@@ -280,24 +280,24 @@ if (!verifyNonce(nonce)) {
 ## 🚀 향후 구현 고려사항
 
 1. **외부 로깅 서비스 연동** (프로덕션)
-   - ELK Stack, Splunk 등
-   - 실시간 모니터링
+    - ELK Stack, Splunk 등
+    - 실시간 모니터링
 
 2. **자동 IP 차단**
-   - 의심스러운 IP 자동 블랙리스트 추가
-   - 관리자 알림
+    - 의심스러운 IP 자동 블랙리스트 추가
+    - 관리자 알림
 
 3. **지리적 위치 검증**
-   - GeoIP 기반 접근 제어
-   - 비정상적인 위치에서의 접근 차단
+    - GeoIP 기반 접근 제어
+    - 비정상적인 위치에서의 접근 차단
 
 4. **API 버전 관리**
-   - 버전별 보안 정책
-   - 하위 호환성 관리
+    - 버전별 보안 정책
+    - 하위 호환성 관리
 
 5. **웹훅 서명 검증**
-   - 외부 웹훅 요청 검증
-   - HMAC 서명 확인
+    - 외부 웹훅 요청 검증
+    - HMAC 서명 확인
 
 ## 🎓 보안 모범 사례 준수
 
