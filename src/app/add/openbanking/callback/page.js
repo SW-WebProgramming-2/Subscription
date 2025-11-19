@@ -48,13 +48,18 @@ export default function OpenBankingCallback() {
         hasAccounts: !!data.accounts,
         accountsCount: data.accounts?.length || 0,
         hasToken: !!data.accessToken,
-        hasUserSeqNo: !!data.userSeqNo
+        hasUserSeqNo: !!data.userSeqNo,
+        fullData: data // 전체 데이터 확인
       });
       
       // 계좌 정보와 인증 정보를 세션 스토리지에 저장
-      if (data.accounts && data.accounts.length > 0) {
+      // accounts가 빈 배열이어도 저장 (나중에 확인 가능하도록)
+      if (data.accounts) {
         sessionStorage.setItem('openbankingAccounts', JSON.stringify(data.accounts));
         console.log('계좌 정보 저장 완료:', data.accounts);
+      } else {
+        console.warn('계좌 정보가 없습니다. 빈 배열로 저장합니다.');
+        sessionStorage.setItem('openbankingAccounts', JSON.stringify([]));
       }
       
       if (data.accessToken) {

@@ -98,15 +98,32 @@ export async function POST(request) {
 
     const accountsData = await accountsResponse.json();
     
+    console.log('오픈뱅킹 API 계좌 목록 응답:', accountsData);
+    
     // 계좌 정보 가공 (API 응답 구조에 맞게 수정)
-    // 오픈뱅킹 API 응답 구조: res_list 배열에 계좌 정보 포함
-    const accounts = (accountsData.res_list || []).map(account => ({
-      accountId: account.account_num || account.fintech_use_num,
-      accountName: account.account_name || account.account_holder_name,
-      accountNumber: account.account_num_masked || account.account_num,
-      balance: parseInt(account.balance_amt || '0', 10),
-      bankCode: account.bank_code_std || account.bank_code
-    }));
+    // 오픈뱅킹 API 응답 구조 확인
+    let accounts = [];
+    
+    if (accountsData.res_list && Array.isArray(accountsData.res_list)) {
+      accounts = accountsData.res_list.map(account => ({
+        accountId: account.account_num || account.fintech_use_num || account.fintech_use_num,
+        accountName: account.account_name || account.account_holder_name || '',
+        accountNumber: account.account_num_masked || account.account_num || '',
+        balance: parseInt(account.balance_amt || account.balance_amt || '0', 10),
+        bankCode: account.bank_code_std || account.bank_code || ''
+      }));
+    } else if (Array.isArray(accountsData)) {
+      // 응답이 배열인 경우
+      accounts = accountsData.map(account => ({
+        accountId: account.account_num || account.fintech_use_num || '',
+        accountName: account.account_name || account.account_holder_name || '',
+        accountNumber: account.account_num_masked || account.account_num || '',
+        balance: parseInt(account.balance_amt || '0', 10),
+        bankCode: account.bank_code_std || account.bank_code || ''
+      }));
+    }
+    
+    console.log('가공된 계좌 정보:', accounts);
 
     return NextResponse.json({
       accounts,
