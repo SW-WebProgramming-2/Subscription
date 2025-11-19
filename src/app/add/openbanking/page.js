@@ -13,6 +13,7 @@ export default function OpenBankingPage() {
   const [userSeqNo, setUserSeqNo] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
   const [subscriptionInfo, setSubscriptionInfo] = useState({
     name: '',
     price: '',
@@ -32,13 +33,22 @@ export default function OpenBankingPage() {
 
   // 컴포넌트 마운트 시 세션 스토리지에서 계좌 정보 불러오기
   useEffect(() => {
+    setIsLoadingAccounts(true);
+    
     const savedAccounts = sessionStorage.getItem('openbankingAccounts');
     const savedToken = sessionStorage.getItem('openbankingAccessToken');
     const savedUserSeqNo = sessionStorage.getItem('openbankingUserSeqNo');
     
+    console.log('세션 스토리지에서 정보 불러오기:', {
+      hasAccounts: !!savedAccounts,
+      hasToken: !!savedToken,
+      hasUserSeqNo: !!savedUserSeqNo
+    });
+    
     if (savedAccounts) {
       try {
         const accounts = JSON.parse(savedAccounts);
+        console.log('계좌 정보 로드:', accounts);
         setAccounts(accounts);
         if (accounts.length > 0) {
           setSelectedBank(accounts[0].bankCode);
@@ -59,6 +69,8 @@ export default function OpenBankingPage() {
       setUserSeqNo(savedUserSeqNo);
       sessionStorage.removeItem('openbankingUserSeqNo');
     }
+    
+    setIsLoadingAccounts(false);
   }, []);
 
   // 계좌 목록과 인증 정보가 모두 로드되면 첫 번째 계좌 자동 선택
@@ -393,39 +405,59 @@ export default function OpenBankingPage() {
             1. 은행 계좌 연동
           </h2>
           
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{
-              display: 'block',
+          {isLoadingAccounts ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+              계좌 정보를 불러오는 중...
+            </div>
+          ) : accounts.length === 0 ? (
+            <>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  은행 선택
+                </label>
+                <select
+                  value={selectedBank}
+                  onChange={(e) => setSelectedBank(e.target.value)}
+                  disabled={isLoading}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '1rem',
+                    background: 'white'
+                  }}
+                >
+                  <option value="">은행을 선택하세요</option>
+                  {banks.map(bank => (
+                    <option key={bank.code} value={bank.code}>
+                      {bank.logo} {bank.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : (
+            <div style={{
+              background: '#f0f9ff',
+              border: '1px solid #0ea5e9',
+              borderRadius: '8px',
+              padding: '1rem',
+              marginBottom: '1.5rem',
               fontSize: '0.875rem',
-              fontWeight: '500',
-              color: '#374151',
-              marginBottom: '0.5rem'
+              color: '#0c4a6e'
             }}>
-              은행 선택
-            </label>
-            <select
-              value={selectedBank}
-              onChange={(e) => setSelectedBank(e.target.value)}
-              disabled={isLoading || accounts.length > 0}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                background: accounts.length > 0 ? '#f3f4f6' : 'white'
-              }}
-            >
-              <option value="">은행을 선택하세요</option>
-              {banks.map(bank => (
-                <option key={bank.code} value={bank.code}>
-                  {bank.logo} {bank.name}
-                </option>
-              ))}
-            </select>
-          </div>
+              ✓ 계좌 연동이 완료되었습니다. 아래 계좌 목록에서 계좌를 선택하세요.
+            </div>
+          )}
 
-          {accounts.length === 0 && (
+          {accounts.length === 0 && !isLoadingAccounts && (
             <button
               onClick={handleOpenBankingAuth}
               disabled={!selectedBank || isLoading}
