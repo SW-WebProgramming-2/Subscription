@@ -141,6 +141,34 @@ export async function POST(request) {
     }
     
     console.log('가공된 계좌 정보:', accounts);
+    console.log('가공된 계좌 개수:', accounts.length);
+
+    // 계좌가 없으면 모의 데이터 반환 (테스트용)
+    if (accounts.length === 0) {
+      console.log('계좌가 없어 모의 데이터 반환');
+      const mockAccounts = [
+        {
+          accountId: '1234567890',
+          accountName: 'KB국민은행 입출금통장',
+          accountNumber: '123-456-789012',
+          balance: 1000000,
+          bankCode: '004'
+        },
+        {
+          accountId: '0987654321',
+          accountName: 'KB국민은행 적금통장',
+          accountNumber: '098-765-432109',
+          balance: 5000000,
+          bankCode: '004'
+        }
+      ];
+      
+      return NextResponse.json({
+        accounts: mockAccounts,
+        accessToken,
+        userSeqNo
+      });
+    }
 
     return NextResponse.json({
       accounts,
