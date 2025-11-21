@@ -36,7 +36,7 @@ export default function Home() {
         
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
           <a href="#" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>구독 조회</a>
-          <a href="#" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>AI 추천</a>
+          <a href="/recommendations" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>AI 추천</a>
         </div>
         
         <div style={{ display: 'flex', gap: '1rem' }}>
@@ -113,7 +113,7 @@ export default function Home() {
               }}>
                 구독 추가하기
               </a>
-              <button style={{
+              <a href="/recommendations" style={{
                 background: 'transparent',
                 color: 'white',
                 border: '2px solid white',
@@ -124,7 +124,7 @@ export default function Home() {
                 cursor: 'pointer'
               }}>
                 AI 추천 받기
-              </button>
+              </a>
             </div>
           </div>
         </section>
