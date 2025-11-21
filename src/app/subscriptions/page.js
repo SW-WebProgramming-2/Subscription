@@ -1,0 +1,462 @@
+'use client';
+
+import { useState, useMemo } from 'react';
+
+export default function SubscriptionsPage() {
+  // 샘플 구독 데이터
+  const [subscriptions] = useState([
+    {
+      id: 1,
+      serviceName: 'Netflix',
+      monthlyPrice: 13500,
+      paymentDay: 15, // 고정된 날짜 대신 결제일(Day) 정보를 기준으로 사용한다고 가정
+      originalNextPayment: '2025-01-15', // 원본 데이터
+      category: 'OTT',
+    },
+    {
+      id: 2,
+      serviceName: 'Spotify',
+      monthlyPrice: 10900,
+      paymentDay: 20,
+      originalNextPayment: '2025-01-20',
+      category: '음악',
+    },
+    {
+      id: 3,
+      serviceName: 'Disney+',
+      monthlyPrice: 9900,
+      paymentDay: 15,
+      originalNextPayment: '2025-01-15',
+      category: 'OTT',
+    },
+    {
+      id: 4,
+      serviceName: 'YouTube Premium',
+      monthlyPrice: 11900,
+      paymentDay: 25,
+      originalNextPayment: '2025-01-25',
+      category: 'OTT',
+    }
+  ]);
+
+  const [currentDate, setCurrentDate] = useState(new Date()); // 현재 보고 있는 달력의 월
+  const [selectedDate, setSelectedDate] = useState(null); // 클릭한 날짜
+
+  // [유틸리티] 현재 보고 있는 월에 맞춰 결제일 계산
+  const getPaymentDateForView = (paymentDay, viewDate) => {
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    // 해당 월의 말일 확인 (예: 2월 30일은 없으므로 2월 28일/29일로 처리해야 함)
+    const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+    const actualDay = Math.min(paymentDay, lastDayOfMonth);
+
+    return new Date(year, month, actualDay);
+  };
+
+  // [로직 수정] 현재 월 기준 표시할 구독 리스트 필터링
+  const displayedSubscriptions = useMemo(() => {
+    // 1. 현재 보고 있는 달(currentDate) 기준으로 모든 구독의 결제일 계산
+    const currentMonthSubs = subscriptions.map(sub => {
+      // 데이터에 paymentDay가 없으면 원본 날짜에서 추출
+      const day = sub.paymentDay || new Date(sub.originalNextPayment).getDate();
+      const paymentDate = getPaymentDateForView(day, currentDate);
+
+      return {
+        ...sub,
+        calculatedPaymentDate: paymentDate // 현재 월 기준 결제일 추가
+      };
+    });
+
+    // 2. 날짜 선택 여부에 따라 필터링
+    if (selectedDate === null) {
+      // 월 보기: 이번 달 전체 리스트 반환
+      return currentMonthSubs.sort((a, b) => a.calculatedPaymentDate - b.calculatedPaymentDate);
+    } else {
+      // 일 보기: 선택한 날짜와 정확히 일치하는 구독만 반환
+      return currentMonthSubs.filter(sub => {
+        return (
+            sub.calculatedPaymentDate.getDate() === selectedDate.getDate() &&
+            sub.calculatedPaymentDate.getMonth() === selectedDate.getMonth() &&
+            sub.calculatedPaymentDate.getFullYear() === selectedDate.getFullYear()
+        );
+      });
+    }
+  }, [subscriptions, selectedDate, currentDate]);
+
+  // totalAmount 계산
+  const totalAmount = useMemo(() => {
+    return displayedSubscriptions.reduce((sum, sub) => sum + (sub.monthlyPrice || 0), 0);
+  }, [displayedSubscriptions]);
+
+  // 통화 포맷팅 함수
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('ko-KR').format(amount) + ' KRW';
+  };
+
+  // 캘린더 헬퍼 함수
+  const getDaysInMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  // [버그 수정] 월의 첫 날 요일 계산 (0: 일요일 ~ 6: 토요일)
+  const getFirstDayOfMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    setSelectedDate(null); // 달이 바뀌면 선택 초기화
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    setSelectedDate(null); // 달이 바뀌면 선택 초기화
+  };
+
+  const handleDateClick = (date, isCurrentMonth) => {
+    // 현재 달이 아닌 날짜를 클릭하면 해당 달로 이동
+    if (!isCurrentMonth) {
+      setCurrentDate(new Date(date.getFullYear(), date.getMonth(), 1));
+      setSelectedDate(null);
+      return;
+    }
+
+    // 이미 선택된 날짜를 다시 누르면 선택 해제
+    if (selectedDate && date.getTime() === selectedDate.getTime()) {
+      setSelectedDate(null);
+    } else {
+      setSelectedDate(date);
+    }
+  };
+
+  // [버그 수정] 특정 날짜에 결제일이 있는지 확인하는 함수 (인디케이터용)
+  const hasPaymentOnDate = (date) => {
+    const day = date.getDate();
+    const month = date.getMonth();
+    const year = date.getFullYear();
+
+    return subscriptions.some(sub => {
+      const pDay = sub.paymentDay || new Date(sub.originalNextPayment).getDate();
+      // 현재 보고 있는 달의 해당 날짜와 결제일이 일치하는지 확인
+      return pDay === day && month === currentDate.getMonth() && year === currentDate.getFullYear();
+    });
+  };
+
+  // [고정 6주 그리드] 42개 셀을 가진 캘린더 날짜 배열 생성
+  const calendarDays = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    // 현재 달의 첫 날과 마지막 날
+    const firstDay = getFirstDayOfMonth(currentDate);
+    const daysInCurrentMonth = getDaysInMonth(currentDate);
+
+    // 이전 달의 마지막 날짜들
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    const daysInPrevMonth = getDaysInMonth(new Date(prevYear, prevMonth, 1));
+
+    const days = [];
+
+    // 1. 이전 달의 마지막 날짜들 (firstDay 개수만큼)
+    for (let i = firstDay - 1; i >= 0; i--) {
+      const day = daysInPrevMonth - i;
+      const date = new Date(prevYear, prevMonth, day);
+      days.push({
+        date,
+        day,
+        isCurrentMonth: false,
+        isPrevMonth: true
+      });
+    }
+
+    // 2. 현재 달의 모든 날짜들
+    for (let day = 1; day <= daysInCurrentMonth; day++) {
+      const date = new Date(year, month, day);
+      days.push({
+        date,
+        day,
+        isCurrentMonth: true,
+        isPrevMonth: false
+      });
+    }
+
+    // 3. 다음 달의 초반 날짜들 (총 42개가 되도록)
+    const remainingDays = 42 - days.length;
+    const nextMonth = month === 11 ? 0 : month + 1;
+    const nextYear = month === 11 ? year + 1 : year;
+
+    for (let day = 1; day <= remainingDays; day++) {
+      const date = new Date(nextYear, nextMonth, day);
+      days.push({
+        date,
+        day,
+        isCurrentMonth: false,
+        isPrevMonth: false
+      });
+    }
+
+    return days;
+  }, [currentDate]);
+
+  const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+
+  return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: 'Arial, sans-serif',
+        background: '#f9fafb'
+      }}>
+        {/* 네비게이션 바 */}
+        <nav style={{
+          background: 'white',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+          padding: '0 2rem',
+          height: '70px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          zIndex: 10
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '1.2rem'
+            }}>
+              S
+            </div>
+            <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937' }}>SubManager</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+            <a href="#" style={{ color: '#667eea', textDecoration: 'none', fontWeight: '600' }}>구독 조회</a>
+            <a href="#" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>AI 추천</a>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button style={{ background: 'transparent', color: '#6b7280', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', fontWeight: '500', cursor: 'pointer' }}>로그인</button>
+            <button style={{ background: '#667eea', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', fontWeight: '500', cursor: 'pointer' }}>회원가입</button>
+          </div>
+        </nav>
+
+        {/* 메인 컨텐츠 */}
+        <main style={{ flex: 1, padding: '2rem 2rem 4rem 2rem' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '2rem',
+            maxWidth: '1400px',
+            margin: '0 auto',
+            minHeight: '600px'
+          }}>
+            {/* 좌측: 월별 캘린더 */}
+            <div style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '2rem',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1.5rem'
+              }}>
+                <button onClick={handlePrevMonth} style={{ background: 'transparent', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '1.2rem', color: '#667eea' }}>←</button>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
+                  {currentDate.getFullYear()}년 {monthNames[currentDate.getMonth()]}
+                </h2>
+                <button onClick={handleNextMonth} style={{ background: 'transparent', border: '1px solid #e5e7eb', borderRadius: '6px', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '1.2rem', color: '#667eea' }}>→</button>
+              </div>
+
+              {/* 요일 헤더 */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                {dayNames.map(day => (
+                    <div key={day} style={{ textAlign: 'center', fontWeight: '600', color: '#6b7280', fontSize: '0.875rem', padding: '0.5rem' }}>{day}</div>
+                ))}
+              </div>
+
+              {/* 캘린더 그리드 - 고정 42개 셀 (7일 × 6주) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.5rem', flex: 1 }}>
+                {calendarDays.map((calendarDay, index) => {
+                  const { date, day, isCurrentMonth } = calendarDay;
+                  const hasPayment = hasPaymentOnDate(date);
+                  const isSelected = selectedDate &&
+                      date.getTime() === selectedDate.getTime();
+                  const today = new Date();
+                  const isToday = isCurrentMonth &&
+                      date.getDate() === today.getDate() &&
+                      date.getMonth() === today.getMonth() &&
+                      date.getFullYear() === today.getFullYear();
+
+                  return (
+                      <button
+                          key={`${date.getFullYear()}-${date.getMonth()}-${day}-${index}`}
+                          onClick={() => handleDateClick(date, isCurrentMonth)}
+                          style={{
+                            aspectRatio: '1',
+                            border: isSelected ? '2px solid #667eea' : '1px solid #e5e7eb',
+                            borderRadius: '8px',
+                            background: isSelected ? '#eff6ff' : isToday ? '#fef3c7' : 'white',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'flex-start',
+                            padding: '0.5rem',
+                            position: 'relative',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) e.currentTarget.style.background = '#f9fafb';
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) e.currentTarget.style.background = isToday ? '#fef3c7' : 'white';
+                          }}
+                      >
+                      <span style={{
+                        fontSize: '0.875rem',
+                        fontWeight: isToday ? 'bold' : 'normal',
+                        color: isSelected
+                            ? '#667eea'
+                            : isCurrentMonth
+                                ? '#1f2937'
+                                : '#d1d5db' // 현재 달이 아닌 날짜는 연한 색
+                      }}>
+                        {day}
+                      </span>
+
+                        {/* 결제일 인디케이터 (보라색 점) - 현재 달에만 표시 */}
+                        {hasPayment && isCurrentMonth && (
+                            <div style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              background: '#667eea',
+                              marginTop: 'auto',
+                              marginBottom: '4px'
+                            }} />
+                        )}
+                      </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 우측: 구독 목록 + 총액 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+              {/* 구독 목록 영역 */}
+              <div style={{
+                background: 'white',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                flex: 1,
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem',
+                maxHeight: '500px' // 스크롤을 위한 높이 제한
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
+                    {selectedDate
+                        ? `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일 결제 예정`
+                        : `${currentDate.getMonth() + 1}월 전체 결제 예정`}
+                  </h3>
+                  {selectedDate && (
+                      <button
+                          onClick={() => setSelectedDate(null)}
+                          style={{ fontSize: '0.8rem', color: '#667eea', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        전체 보기
+                      </button>
+                  )}
+                </div>
+
+                {displayedSubscriptions.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#6b7280' }}>
+                      <p style={{ fontSize: '1rem', margin: 0 }}>
+                        {selectedDate
+                            ? '이 날짜에는 결제 예정인 구독이 없습니다.'
+                            : '이번 달에는 예정된 결제가 없습니다.'}
+                      </p>
+                    </div>
+                ) : (
+                    displayedSubscriptions.map(sub => (
+                        <div
+                            key={sub.id}
+                            style={{
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '8px',
+                              padding: '1rem',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              transition: 'all 0.2s'
+                            }}
+                        >
+                          <div>
+                            <h4 style={{ fontSize: '1rem', fontWeight: '600', color: '#1f2937', margin: '0 0 0.25rem 0' }}>
+                              {sub.serviceName}
+                            </h4>
+                            <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                              {/* [버그 수정] 현재 달력 기준 날짜 표시 */}
+                              결제일: {sub.calculatedPaymentDate.toLocaleDateString('ko-KR')}
+                            </p>
+                          </div>
+                          <div style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#667eea' }}>
+                            {formatCurrency(sub.monthlyPrice)}
+                          </div>
+                        </div>
+                    ))
+                )}
+              </div>
+
+              {/* 총 결제 금액 (하단 Sticky Footer 스타일) */}
+              <div style={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: '12px',
+                padding: '2rem',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                color: 'white',
+                marginTop: 'auto'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1rem', fontWeight: '500', margin: '0 0 0.5rem 0', opacity: 0.9 }}>
+                      {selectedDate ? '선택 일자 합계' : '이번 달 총 합계'}
+                    </h3>
+                    <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
+                      {formatCurrency(totalAmount)}
+                    </p>
+                  </div>
+                  <div style={{ fontSize: '3rem', opacity: 0.3 }}>💳</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* 푸터 (기존 유지) */}
+        <footer style={{ background: '#1f2937', color: 'white', padding: '3rem 2rem 2rem 2rem', marginTop: 'auto' }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center', color: '#9ca3af', fontSize: '0.8rem' }}>
+            &copy; 2024 SubManager. All rights reserved.
+          </div>
+        </footer>
+      </div>
+  );
+}
