@@ -5,9 +5,27 @@
 // Node.js의 global 객체를 사용하여 데이터 유지
 if (!global.users) {
   global.users = [];
+  // admin 계정 초기화
+  initializeAdmin();
 }
 
 const users = global.users;
+
+// admin 계정 초기화
+function initializeAdmin() {
+  const adminExists = global.users.find(user => user.username === 'admin');
+  if (!adminExists) {
+    global.users.push({
+      id: 'admin-001',
+      name: '관리자',
+      username: 'admin',
+      email: 'admin@submanager.com',
+      password: 'admin', // 실제로는 해시화된 비밀번호 저장
+      isAdmin: true,
+      createdAt: new Date().toISOString()
+    });
+  }
+}
 
 export function addUser(user) {
   users.push(user);
@@ -39,5 +57,14 @@ export function getAllUsers() {
 
 export function getUsers() {
   return users;
+}
+
+export function deleteUserById(id) {
+  const index = users.findIndex(user => String(user.id) === String(id));
+  if (index !== -1) {
+    users.splice(index, 1);
+    return true;
+  }
+  return false;
 }
 

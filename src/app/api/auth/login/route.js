@@ -40,7 +40,7 @@ export async function POST(request) {
 
     // JWT 토큰 생성 (간단한 예시, 실제로는 jwt 라이브러리 사용)
     // 프로덕션에서는 jwt.sign() 사용
-    const token = generateSimpleToken(user.id);
+    const token = generateSimpleToken(user.id, user.isAdmin || false);
 
     // 성공 응답
     return NextResponse.json(
@@ -51,7 +51,8 @@ export async function POST(request) {
           id: user.id,
           name: user.name,
           username: user.username,
-          email: user.email
+          email: user.email,
+          isAdmin: user.isAdmin || false
         }
       },
       { status: 200 }
@@ -66,9 +67,10 @@ export async function POST(request) {
 
 // 간단한 토큰 생성 (개발용)
 // 프로덕션에서는 jsonwebtoken 라이브러리 사용 권장
-function generateSimpleToken(userId) {
+function generateSimpleToken(userId, isAdmin = false) {
   const payload = {
     userId,
+    isAdmin,
     timestamp: Date.now(),
     // 실제로는 만료 시간 등 추가
   };

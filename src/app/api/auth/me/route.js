@@ -46,6 +46,7 @@ export async function GET(request) {
           name: user.name,
           username: user.username,
           email: user.email,
+          isAdmin: user.isAdmin || false,
           createdAt: user.createdAt
         }
       },

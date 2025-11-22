@@ -15,6 +15,10 @@ export default function ProfilePage() {
   const [newEmail, setNewEmail] = useState('');
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [allUsers, setAllUsers] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     // 로그인 상태 확인
@@ -40,6 +44,11 @@ export default function ProfilePage() {
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
+        // admin인 경우 비밀번호 확인 없이 바로 회원 목록 조회
+        if (data.user.isAdmin) {
+          setIsVerified(true);
+          fetchAllUsers();
+        }
       } else {
         const errorData = await response.json().catch(() => ({}));
         if (response.status === 401) {
@@ -112,6 +121,89 @@ export default function ProfilePage() {
     setIsEditingEmail(false);
     setNewEmail('');
     setEmailError('');
+  };
+
+  const fetchAllUsers = async () => {
+    setIsLoadingUsers(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/auth/admin/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAllUsers(data.users);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setError(errorData.error || '회원 목록을 불러오는데 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('회원 목록 조회 오류:', error);
+      setError('네트워크 오류가 발생했습니다.');
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  const handleViewUserDetail = async (userId) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/auth/admin/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ userId })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedUser(data.user);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.error || '회원 정보를 불러오는데 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('회원 상세 조회 오류:', error);
+      alert('네트워크 오류가 발생했습니다.');
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!confirm('정말 이 회원을 삭제하시겠습니까?')) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/auth/admin/users', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ userId })
+      });
+
+      if (response.ok) {
+        alert('회원이 삭제되었습니다.');
+        fetchAllUsers(); // 목록 새로고침
+        setSelectedUser(null);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.error || '회원 삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('회원 삭제 오류:', error);
+      alert('네트워크 오류가 발생했습니다.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleUpdateEmail = async (e) => {
@@ -271,7 +363,158 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {!isVerified ? (
+        {user.isAdmin ? (
+          <div>
+            <div style={{
+              background: '#fef3c7',
+              border: '1px solid #fcd34d',
+              borderRadius: '8px',
+              padding: '1rem',
+              marginBottom: '2rem',
+              color: '#92400e',
+              fontSize: '0.875rem',
+              fontWeight: '500'
+            }}>
+              ⚠ 관리자 모드
+            </div>
+
+            <h2 style={{
+              fontSize: '1.5rem',
+              fontWeight: 'bold',
+              color: '#1f2937',
+              marginBottom: '1.5rem'
+            }}>
+              전체 회원 목록
+            </h2>
+
+            {isLoadingUsers ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                로딩 중...
+              </div>
+            ) : allUsers.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                등록된 회원이 없습니다.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {allUsers.map((member) => (
+                  <div
+                    key={member.id}
+                    style={{
+                      padding: '1rem',
+                      background: '#f9fafb',
+                      borderRadius: '8px',
+                      border: selectedUser?.id === member.id ? '2px solid #667eea' : '1px solid #e5e7eb',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <span style={{ fontSize: '1rem', fontWeight: '500', color: '#1f2937' }}>
+                      {member.username}
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        onClick={() => handleViewUserDetail(member.id)}
+                        style={{
+                          background: '#667eea',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.5rem 1rem',
+                          borderRadius: '6px',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        조회
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(member.id)}
+                        disabled={isDeleting}
+                        style={{
+                          background: isDeleting ? '#9ca3af' : '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.5rem 1rem',
+                          borderRadius: '6px',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          cursor: isDeleting ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {selectedUser && (
+              <div style={{
+                marginTop: '2rem',
+                padding: '1.5rem',
+                background: '#f0f9ff',
+                border: '1px solid #bae6fd',
+                borderRadius: '8px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
+                    회원 상세 정보
+                  </h3>
+                  <button
+                    onClick={() => setSelectedUser(null)}
+                    style={{
+                      background: 'transparent',
+                      color: '#6b7280',
+                      border: 'none',
+                      fontSize: '1.5rem',
+                      cursor: 'pointer',
+                      padding: 0,
+                      width: '24px',
+                      height: '24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: '500' }}>이름</label>
+                    <div style={{ marginTop: '0.25rem', color: '#1f2937' }}>{selectedUser.name}</div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: '500' }}>아이디</label>
+                    <div style={{ marginTop: '0.25rem', color: '#1f2937' }}>{selectedUser.username}</div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.875rem', color: '#6b7280', fontWeight: '500' }}>이메일</label>
+                    <div style={{ marginTop: '0.25rem', color: '#1f2937' }}>{selectedUser.email}</div>
+                  </div>
+                  {selectedUser.isAdmin && (
+                    <div>
+                      <span style={{
+                        display: 'inline-block',
+                        background: '#fef3c7',
+                        color: '#92400e',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        fontWeight: '500'
+                      }}>
+                        관리자
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : !isVerified ? (
           <div>
             <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
               회원 정보를 확인하기 위해 비밀번호를 입력해주세요.
