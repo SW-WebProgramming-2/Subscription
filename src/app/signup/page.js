@@ -127,15 +127,31 @@ export default function SignupPage() {
         maxWidth: '450px',
         boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1)'
       }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+        <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{
             fontSize: '2rem',
             fontWeight: 'bold',
             color: '#1f2937',
-            marginBottom: '0.5rem'
+            margin: 0
           }}>
             회원가입
           </h1>
+          <button
+            onClick={() => router.push('/')}
+            style={{
+              background: 'transparent',
+              color: '#667eea',
+              border: '1px solid #667eea',
+              padding: '0.5rem 1rem',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            메인으로
+          </button>
+        </div>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <p style={{ color: '#6b7280', fontSize: '0.95rem' }}>
             SubManager에 오신 것을 환영합니다
           </p>
