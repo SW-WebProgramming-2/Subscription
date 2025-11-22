@@ -1,4 +1,27 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
 export default function Home() {
+  const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // 로그인 상태 확인
+    const token = localStorage.getItem('authToken');
+    setIsLoggedIn(!!token);
+    setIsLoading(false);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    setIsLoggedIn(false);
+    router.push('/');
+  };
+
   return (
     <div style={{ 
       minHeight: '100vh', 
@@ -40,28 +63,68 @@ export default function Home() {
         </div>
         
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button style={{
-            background: 'transparent',
-            color: '#6b7280',
-            border: 'none',
-            padding: '0.5rem 1rem',
-            borderRadius: '6px',
-            fontWeight: '500',
-            cursor: 'pointer'
-          }}>
-            로그인
-          </button>
-          <button style={{
-            background: '#667eea',
-            color: 'white',
-            border: 'none',
-            padding: '0.5rem 1rem',
-            borderRadius: '6px',
-            fontWeight: '500',
-            cursor: 'pointer'
-          }}>
-            회원가입
-          </button>
+          {isLoading ? (
+            <div style={{ color: '#6b7280' }}>로딩 중...</div>
+          ) : isLoggedIn ? (
+            <>
+              <a href="/profile" style={{
+                background: '#667eea',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'inline-block'
+              }}>
+                회원 정보 조회
+              </a>
+              <button
+                onClick={handleLogout}
+                style={{
+                  background: 'transparent',
+                  color: '#6b7280',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                로그아웃
+              </button>
+            </>
+          ) : (
+            <>
+              <a href="/login" style={{
+                background: 'transparent',
+                color: '#6b7280',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'inline-block'
+              }}>
+                로그인
+              </a>
+              <a href="/signup" style={{
+                background: '#667eea',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'inline-block'
+              }}>
+                회원가입
+              </a>
+            </>
+          )}
         </div>
       </nav>
 
