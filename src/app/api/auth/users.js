@@ -24,9 +24,7 @@ export function getUserByUsername(username) {
 export function getUserById(id) {
   // 타입 변환하여 비교 (문자열과 숫자 모두 지원)
   const userId = String(id);
-  const found = users.find(user => String(user.id) === userId);
-  console.log(`getUserById 호출: 찾는 ID=${userId}, 타입=${typeof id}, 결과=${found ? '찾음' : '없음'}`);
-  return found;
+  return users.find(user => String(user.id) === userId);
 }
 
 export function getAllUsers() {

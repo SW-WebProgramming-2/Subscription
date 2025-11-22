@@ -11,6 +11,10 @@ export default function ProfilePage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [error, setError] = useState('');
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const [emailError, setEmailError] = useState('');
 
   useEffect(() => {
     // 로그인 상태 확인
@@ -98,6 +102,70 @@ export default function ProfilePage() {
     router.push('/');
   };
 
+  const handleEditEmail = () => {
+    setIsEditingEmail(true);
+    setNewEmail(user.email);
+    setEmailError('');
+  };
+
+  const handleCancelEditEmail = () => {
+    setIsEditingEmail(false);
+    setNewEmail('');
+    setEmailError('');
+  };
+
+  const handleUpdateEmail = async (e) => {
+    e.preventDefault();
+    setIsUpdatingEmail(true);
+    setEmailError('');
+
+    // 이메일 유효성 검사
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!newEmail.trim()) {
+      setEmailError('이메일을 입력해주세요.');
+      setIsUpdatingEmail(false);
+      return;
+    }
+    if (!emailRegex.test(newEmail.trim())) {
+      setEmailError('올바른 이메일 형식이 아닙니다.');
+      setIsUpdatingEmail(false);
+      return;
+    }
+    if (newEmail.trim() === user.email) {
+      setEmailError('현재 이메일과 동일합니다.');
+      setIsUpdatingEmail(false);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/auth/update-email', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ email: newEmail.trim() })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.user);
+        setIsEditingEmail(false);
+        setNewEmail('');
+        alert('이메일이 변경되었습니다.');
+      } else {
+        const data = await response.json();
+        setEmailError(data.error || '이메일 변경에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('이메일 변경 오류:', error);
+      setEmailError('네트워크 오류가 발생했습니다.');
+    } finally {
+      setIsUpdatingEmail(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div style={{
@@ -171,20 +239,36 @@ export default function ProfilePage() {
           }}>
             회원 정보
           </h1>
-          <button
-            onClick={handleLogout}
-            style={{
-              background: 'transparent',
-              color: '#6b7280',
-              border: '1px solid #d1d5db',
-              padding: '0.5rem 1rem',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: '500'
-            }}
-          >
-            로그아웃
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={() => router.push('/')}
+              style={{
+                background: 'transparent',
+                color: '#667eea',
+                border: '1px solid #667eea',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: '500'
+              }}
+            >
+              메인으로
+            </button>
+            <button
+              onClick={handleLogout}
+              style={{
+                background: 'transparent',
+                color: '#6b7280',
+                border: '1px solid #d1d5db',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: '500'
+              }}
+            >
+              로그아웃
+            </button>
+          </div>
         </div>
 
         {!isVerified ? (
@@ -312,24 +396,112 @@ export default function ProfilePage() {
               </div>
 
               <div>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  color: '#6b7280',
-                  fontSize: '0.875rem',
-                  fontWeight: '500'
-                }}>
-                  이메일
-                </label>
-                <div style={{
-                  padding: '0.75rem',
-                  background: '#f9fafb',
-                  borderRadius: '8px',
-                  color: '#1f2937',
-                  fontSize: '1rem'
-                }}>
-                  {user.email}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <label style={{
+                    color: '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}>
+                    이메일
+                  </label>
+                  {!isEditingEmail && (
+                    <button
+                      onClick={handleEditEmail}
+                      style={{
+                        background: 'transparent',
+                        color: '#667eea',
+                        border: 'none',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '4px',
+                        fontSize: '0.875rem',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      수정
+                    </button>
+                  )}
                 </div>
+                {isEditingEmail ? (
+                  <form onSubmit={handleUpdateEmail}>
+                    <input
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => {
+                        setNewEmail(e.target.value);
+                        setEmailError('');
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: `1px solid ${emailError ? '#ef4444' : '#d1d5db'}`,
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        marginBottom: '0.5rem'
+                      }}
+                      disabled={isUpdatingEmail}
+                    />
+                    {emailError && (
+                      <p style={{
+                        color: '#ef4444',
+                        fontSize: '0.875rem',
+                        marginBottom: '0.5rem',
+                        marginTop: 0
+                      }}>
+                        {emailError}
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="submit"
+                        disabled={isUpdatingEmail}
+                        style={{
+                          flex: 1,
+                          background: isUpdatingEmail ? '#9ca3af' : '#667eea',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.75rem',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          cursor: isUpdatingEmail ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        {isUpdatingEmail ? '변경 중...' : '저장'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelEditEmail}
+                        disabled={isUpdatingEmail}
+                        style={{
+                          flex: 1,
+                          background: 'transparent',
+                          color: '#6b7280',
+                          border: '1px solid #d1d5db',
+                          padding: '0.75rem',
+                          borderRadius: '8px',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          cursor: isUpdatingEmail ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        취소
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div style={{
+                    padding: '0.75rem',
+                    background: '#f9fafb',
+                    borderRadius: '8px',
+                    color: '#1f2937',
+                    fontSize: '1rem'
+                  }}>
+                    {user.email}
+                  </div>
+                )}
               </div>
 
               <div>
