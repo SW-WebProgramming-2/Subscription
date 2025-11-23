@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import Link from 'next/link';
 import { subscriptionAPI } from '@/lib/api';
 
 export default function SubscriptionsPage() {
@@ -237,7 +238,7 @@ export default function SubscriptionsPage() {
           justifyContent: 'space-between',
           zIndex: 10
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none', cursor: 'pointer' }}>
             <div style={{
               width: '40px',
               height: '40px',
@@ -253,7 +254,7 @@ export default function SubscriptionsPage() {
               S
             </div>
             <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937' }}>SubManager</span>
-          </div>
+          </Link>
 
           <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
             <a href="#" style={{ color: '#667eea', textDecoration: 'none', fontWeight: '600' }}>구독 조회</a>
