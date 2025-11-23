@@ -35,7 +35,7 @@ export default function Home() {
         </div>
         
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-          <a href="#" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>구독 조회</a>
+          <a href="/subscriptions" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>구독 조회</a>
           <a href="#" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>AI 추천</a>
         </div>
         
@@ -279,11 +279,10 @@ export default function Home() {
             <div>
               <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1.5rem' }}>서비스</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {['구독 관리', '대시보드', 'AI 추천', '지출 분석'].map((item, index) => (
-                  <a key={index} href="#" style={{ color: '#d1d5db', textDecoration: 'none', fontSize: '0.95rem' }}>
-                    {item}
-                  </a>
-                ))}
+                <a href="/subscriptions" style={{ color: '#d1d5db', textDecoration: 'none', fontSize: '0.95rem' }}>구독 관리</a>
+                <a href="#" style={{ color: '#d1d5db', textDecoration: 'none', fontSize: '0.95rem' }}>대시보드</a>
+                <a href="#" style={{ color: '#d1d5db', textDecoration: 'none', fontSize: '0.95rem' }}>AI 추천</a>
+                <a href="#" style={{ color: '#d1d5db', textDecoration: 'none', fontSize: '0.95rem' }}>지출 분석</a>
               </div>
             </div>
             
