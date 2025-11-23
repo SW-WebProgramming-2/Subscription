@@ -1,46 +1,62 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { subscriptionAPI } from '@/lib/api';
 
 export default function SubscriptionsPage() {
-  // 샘플 구독 데이터
-  const [subscriptions] = useState([
-    {
-      id: 1,
-      serviceName: 'Netflix',
-      monthlyPrice: 13500,
-      paymentDay: 15, // 고정된 날짜 대신 결제일(Day) 정보를 기준으로 사용한다고 가정
-      originalNextPayment: '2025-01-15', // 원본 데이터
-      category: 'OTT',
-    },
-    {
-      id: 2,
-      serviceName: 'Spotify',
-      monthlyPrice: 10900,
-      paymentDay: 20,
-      originalNextPayment: '2025-01-20',
-      category: '음악',
-    },
-    {
-      id: 3,
-      serviceName: 'Disney+',
-      monthlyPrice: 9900,
-      paymentDay: 15,
-      originalNextPayment: '2025-01-15',
-      category: 'OTT',
-    },
-    {
-      id: 4,
-      serviceName: 'YouTube Premium',
-      monthlyPrice: 11900,
-      paymentDay: 25,
-      originalNextPayment: '2025-01-25',
-      category: 'OTT',
-    }
-  ]);
+  // 구독 데이터 (API에서 불러옴)
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [currentDate, setCurrentDate] = useState(new Date()); // 현재 보고 있는 달력의 월
   const [selectedDate, setSelectedDate] = useState(null); // 클릭한 날짜
+
+  // 구독 목록 불러오기 (구독 추가에서 사용하는 것과 동일한 API)
+  useEffect(() => {
+    const fetchSubscriptions = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        // TODO: userId는 실제 인증 시스템에서 가져와야 함
+        // 현재는 임시로 빈 값이나 기본값 사용
+        const userId = localStorage.getItem('userId') || null;
+        const response = await subscriptionAPI.getSubscriptions(userId);
+        
+        // API 응답 형식에 맞게 데이터 변환
+        // 백엔드 응답: { subscriptions: [...] }
+        const subscriptionsData = response.subscriptions || response || [];
+        
+        // 백엔드 데이터 형식을 프론트엔드 형식으로 변환
+        const transformedSubscriptions = subscriptionsData.map(sub => {
+          // 백엔드: name, price, next_payment_date
+          // 프론트엔드: serviceName, monthlyPrice, paymentDay, originalNextPayment
+          const nextPaymentDate = sub.next_payment_date || sub.nextPaymentDate;
+          const paymentDay = nextPaymentDate ? new Date(nextPaymentDate).getDate() : null;
+          
+          return {
+            id: sub.id,
+            serviceName: sub.name || sub.serviceName,
+            monthlyPrice: sub.price || sub.monthlyPrice,
+            paymentDay: paymentDay || sub.paymentDay,
+            originalNextPayment: nextPaymentDate || sub.originalNextPayment,
+            category: sub.category || '기타',
+          };
+        });
+        
+        setSubscriptions(transformedSubscriptions);
+      } catch (err) {
+        console.error('구독 목록 불러오기 오류:', err);
+        setError('구독 목록을 불러오는 중 오류가 발생했습니다.');
+        // 에러 발생 시 빈 배열로 설정
+        setSubscriptions([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSubscriptions();
+  }, []); // 컴포넌트 마운트 시 한 번만 실행
 
   // [유틸리티] 현재 보고 있는 월에 맞춰 결제일 계산
   const getPaymentDateForView = (paymentDay, viewDate) => {
@@ -387,7 +403,15 @@ export default function SubscriptionsPage() {
                   )}
                 </div>
 
-                {displayedSubscriptions.length === 0 ? (
+                {isLoading ? (
+                    <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#6b7280' }}>
+                      <p style={{ fontSize: '1rem', margin: 0 }}>구독 정보를 불러오는 중...</p>
+                    </div>
+                ) : error ? (
+                    <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#ef4444' }}>
+                      <p style={{ fontSize: '1rem', margin: 0 }}>{error}</p>
+                    </div>
+                ) : displayedSubscriptions.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#6b7280' }}>
                       <p style={{ fontSize: '1rem', margin: 0 }}>
                         {selectedDate
