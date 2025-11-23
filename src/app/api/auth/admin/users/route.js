@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAllUsers, getUserById, deleteUserById } from '../../users';
+import { deleteSubscriptionsByUserId } from '../../../subscriptions/subscriptions';
 
 // 관리자 권한 확인 함수
 function checkAdminAuth(request) {
@@ -137,6 +138,9 @@ export async function DELETE(request) {
       );
     }
 
+    // 해당 사용자의 구독 정보(오픈뱅킹 정보 포함) 삭제
+    deleteSubscriptionsByUserId(userId);
+
     const deleted = deleteUserById(userId);
     
     if (!deleted) {
@@ -147,7 +151,7 @@ export async function DELETE(request) {
     }
 
     return NextResponse.json(
-      { message: '회원이 삭제되었습니다.' },
+      { message: '회원과 연동된 오픈뱅킹 정보가 모두 삭제되었습니다.' },
       { status: 200 }
     );
   } catch (error) {
