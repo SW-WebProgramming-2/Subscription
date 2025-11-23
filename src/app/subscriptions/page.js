@@ -9,6 +9,7 @@ export default function SubscriptionsPage() {
   const [subscriptions, setSubscriptions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [currentDate, setCurrentDate] = useState(new Date()); // 현재 보고 있는 달력의 월
   const [selectedDate, setSelectedDate] = useState(null); // 클릭한 날짜
@@ -19,10 +20,8 @@ export default function SubscriptionsPage() {
       try {
         setIsLoading(true);
         setError(null);
-        // TODO: userId는 실제 인증 시스템에서 가져와야 함
-        // 현재는 임시로 빈 값이나 기본값 사용
-        const userId = localStorage.getItem('userId') || null;
-        const response = await subscriptionAPI.getSubscriptions(userId);
+        // 인증 토큰을 통해 자동으로 자신의 구독만 조회됨
+        const response = await subscriptionAPI.getSubscriptions();
         
         // API 응답 형식에 맞게 데이터 변환
         // 백엔드 응답: { subscriptions: [...] }
@@ -42,6 +41,8 @@ export default function SubscriptionsPage() {
             paymentDay: paymentDay || sub.paymentDay,
             originalNextPayment: nextPaymentDate || sub.originalNextPayment,
             category: sub.category || '기타',
+            userId: sub.userId || null, // admin 조회 시 사용자 ID
+            username: sub.username || null, // 사용자 이름
           };
         });
         
@@ -55,6 +56,17 @@ export default function SubscriptionsPage() {
         setIsLoading(false);
       }
     };
+
+    // admin 여부 확인
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setIsAdmin(user.isAdmin || false);
+      } catch (e) {
+        setIsAdmin(false);
+      }
+    }
 
     fetchSubscriptions();
   }, []); // 컴포넌트 마운트 시 한 번만 실행
@@ -441,6 +453,11 @@ export default function SubscriptionsPage() {
                             <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
                               {/* [버그 수정] 현재 달력 기준 날짜 표시 */}
                               결제일: {sub.calculatedPaymentDate.toLocaleDateString('ko-KR')}
+                              {isAdmin && sub.username && (
+                                <span style={{ marginLeft: '0.5rem', color: '#667eea', fontWeight: '500' }}>
+                                  ({sub.username})
+                                </span>
+                              )}
                             </p>
                           </div>
                           <div style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#667eea' }}>

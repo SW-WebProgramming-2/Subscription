@@ -96,9 +96,23 @@ export const authAPI = {
 
 // 구독 서비스 관련 API
 export const subscriptionAPI = {
-  // 구독 서비스 목록 조회
-  getSubscriptions: (userId) =>
-    apiClient.get(`/subscriptions?userId=${userId}`),
+  // 구독 서비스 목록 조회 (Next.js API 사용, 인증 토큰으로 자동 필터링)
+  getSubscriptions: (userId) => {
+    // Next.js API 경로 사용 (Django 백엔드가 아닌)
+    const token = localStorage.getItem('authToken');
+    return fetch('/api/subscriptions', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      }
+    }).then(res => {
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      return res.json();
+    });
+  },
 
   // 구독 서비스 상세 조회
   getSubscription: (id) =>
