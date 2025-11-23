@@ -337,14 +337,29 @@ export default function OpenBankingPage() {
       });
 
       if (!response.ok) {
-        throw new Error('구독 정보 저장 실패');
+        // 에러 응답의 상세 정보 확인
+        let errorMessage = '구독 정보 저장 실패';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+          console.error('API 에러 응답:', errorData);
+        } catch (e) {
+          const errorText = await response.text();
+          console.error('API 에러 응답 (텍스트):', errorText);
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(`${errorMessage} (상태 코드: ${response.status})`);
       }
 
+      const data = await response.json();
+      console.log('구독 정보 저장 성공:', data);
+      
       alert('구독 서비스가 성공적으로 추가되었습니다.');
       router.push('/subscriptions');
     } catch (error) {
       console.error('구독 정보 저장 오류:', error);
-      alert('구독 정보 저장 중 오류가 발생했습니다.');
+      const errorMessage = error.message || '구독 정보 저장 중 오류가 발생했습니다.';
+      alert(`구독 정보 저장 오류: ${errorMessage}\n\n자세한 내용은 브라우저 콘솔을 확인해주세요.`);
       setIsLoading(false);
     }
   };
