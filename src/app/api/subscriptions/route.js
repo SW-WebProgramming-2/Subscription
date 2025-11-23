@@ -161,7 +161,42 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const auth = checkAuth(request);
+    
+    // 개발 환경이거나 인증 토큰이 없으면 임시 사용자로 처리
     if (!auth.authorized) {
+      if (process.env.NODE_ENV === 'development') {
+        // 개발 환경: 임시 사용자 ID 사용
+        const tempAuth = { authorized: true, userId: 'temp_user_1', isAdmin: false };
+        const body = await request.json();
+        const { name, price, billingCycle, category, accountId, accountNumber, bankCode } = body;
+
+        if (!name || !price) {
+          return NextResponse.json(
+            { error: '구독 서비스명과 가격은 필수입니다.' },
+            { status: 400 }
+          );
+        }
+
+        const subscription = addSubscription({
+          userId: tempAuth.userId,
+          name,
+          price: parseFloat(price),
+          billingCycle: billingCycle || 'monthly',
+          category: category || '',
+          accountId: accountId || null,
+          accountNumber: accountNumber || null,
+          bankCode: bankCode || null
+        });
+
+        return NextResponse.json(
+          { 
+            message: '구독 서비스가 추가되었습니다.',
+            subscription 
+          },
+          { status: 201 }
+        );
+      }
+      
       return NextResponse.json(
         { error: auth.error },
         { status: 401 }

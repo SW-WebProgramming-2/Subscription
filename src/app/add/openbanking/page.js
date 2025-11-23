@@ -322,12 +322,22 @@ export default function OpenBankingPage() {
     setIsLoading(true);
 
     try {
+      // 인증 토큰 가져오기 (로컬 스토리지에서)
+      const authToken = localStorage.getItem('authToken');
+      
       // 구독 정보 저장 API 호출
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      // 인증 토큰이 있으면 헤더에 추가
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+      
       const response = await fetch('/api/subscriptions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: JSON.stringify({
           ...subscriptionInfo,
           accountId: selectedAccount.accountId,
