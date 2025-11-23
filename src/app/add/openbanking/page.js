@@ -337,16 +337,23 @@ export default function OpenBankingPage() {
       });
 
       if (!response.ok) {
-        // 에러 응답의 상세 정보 확인
+        // 에러 응답의 상세 정보 확인 (응답 본문을 한 번만 읽어야 함)
         let errorMessage = '구독 정보 저장 실패';
         try {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorData.message || errorMessage;
-          console.error('API 에러 응답:', errorData);
-        } catch (e) {
           const errorText = await response.text();
           console.error('API 에러 응답 (텍스트):', errorText);
-          errorMessage = errorText || errorMessage;
+          
+          // JSON 파싱 시도
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorData.message || errorMessage;
+            console.error('API 에러 응답 (JSON):', errorData);
+          } catch (parseError) {
+            // JSON이 아니면 텍스트 그대로 사용
+            errorMessage = errorText || errorMessage;
+          }
+        } catch (e) {
+          console.error('에러 응답 읽기 실패:', e);
         }
         throw new Error(`${errorMessage} (상태 코드: ${response.status})`);
       }
