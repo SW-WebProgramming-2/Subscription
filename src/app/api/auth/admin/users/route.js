@@ -37,6 +37,35 @@ export async function GET(request) {
       );
     }
 
+    // Django 백엔드에서 사용자 목록 조회
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    
+    try {
+      const response = await fetch(`${backendUrl}/api/users/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return NextResponse.json(
+          {
+            users: (data.users || []).map(user => ({
+              id: user.id,
+              username: user.username,
+              createdAt: user.created_at || user.date_joined || user.createdAt
+            }))
+          },
+          { status: 200 }
+        );
+      }
+    } catch (fetchError) {
+      console.error('Django 백엔드 연결 오류:', fetchError);
+    }
+
+    // Django 백엔드 연결 실패 시 메모리 기반으로 폴백
     const users = getAllUsers();
     
     return NextResponse.json(
