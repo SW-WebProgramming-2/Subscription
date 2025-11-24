@@ -66,52 +66,90 @@ export async function POST(request) {
       );
     }
 
-    // 중복 아이디 확인
-    const existingUsername = getUserByUsername(username);
-    if (existingUsername) {
+    // Django 백엔드로 사용자 생성 요청
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    
+    try {
+      const response = await fetch(`${backendUrl}/api/users/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          username,
+          email,
+          password
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Django 백엔드에서 오류 응답
+        return NextResponse.json(
+          { error: data.error || '회원가입에 실패했습니다.' },
+          { status: response.status }
+        );
+      }
+
+      // 성공 응답
       return NextResponse.json(
-        { error: '이미 사용 중인 아이디입니다.' },
-        { status: 409 }
+        {
+          message: data.message || '회원가입이 완료되었습니다.',
+          user: data.user
+        },
+        { status: 201 }
+      );
+    } catch (fetchError) {
+      console.error('Django 백엔드 연결 오류:', fetchError);
+      
+      // Django 백엔드 연결 실패 시 메모리 기반으로 폴백
+      // 중복 아이디 확인
+      const existingUsername = getUserByUsername(username);
+      if (existingUsername) {
+        return NextResponse.json(
+          { error: '이미 사용 중인 아이디입니다.' },
+          { status: 409 }
+        );
+      }
+
+      // 중복 이메일 확인
+      const existingUser = getUserByEmail(email);
+      if (existingUser) {
+        return NextResponse.json(
+          { error: '이미 사용 중인 이메일입니다.' },
+          { status: 409 }
+        );
+      }
+
+      // 메모리 기반 사용자 생성 (폴백)
+      const newUser = {
+        id: Date.now().toString(),
+        name,
+        username,
+        email,
+        password,
+        createdAt: new Date().toISOString()
+      };
+
+      addUser(newUser);
+
+      return NextResponse.json(
+        {
+          message: '회원가입이 완료되었습니다. (로컬 저장)',
+          user: {
+            id: newUser.id,
+            name: newUser.name,
+            username: newUser.username,
+            email: newUser.email
+          }
+        },
+        { status: 201 }
       );
     }
-
-    // 중복 이메일 확인
-    // 실제로는 데이터베이스에서 확인
-    const existingUser = getUserByEmail(email);
-    if (existingUser) {
-      return NextResponse.json(
-        { error: '이미 사용 중인 이메일입니다.' },
-        { status: 409 }
-      );
-    }
-
-    // 사용자 생성
-    // 실제로는 비밀번호를 해시화하여 저장해야 함 (bcrypt 등 사용)
-    const newUser = {
-      id: Date.now().toString(),
-      name,
-      username,
-      email,
-      password, // 실제로는 해시화된 비밀번호 저장
-      createdAt: new Date().toISOString()
-    };
-
-    addUser(newUser);
-
-    // 성공 응답 (비밀번호는 제외)
-    return NextResponse.json(
-      {
-        message: '회원가입이 완료되었습니다.',
-        user: {
-          id: newUser.id,
-          name: newUser.name,
-          username: newUser.username,
-          email: newUser.email
-        }
-      },
-      { status: 201 }
-    );
   } catch (error) {
+    console.error('회원가입 오류:', error);
     return NextResponse.json(
       { error: '서버 오류가 발생했습니다.' },
       { status: 500 }
@@ -121,11 +159,45 @@ export async function POST(request) {
 
 // 개발/테스트용: 사용자 목록 조회 (실제로는 제거하거나 인증 필요)
 export async function GET() {
-  return NextResponse.json(
-    {
-      users: getAllUsers()
-    },
-    { status: 200 }
-  );
+  try {
+    // Django 백엔드에서 사용자 목록 조회
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    
+    try {
+      const response = await fetch(`${backendUrl}/api/users/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return NextResponse.json(
+          {
+            users: data.users || []
+          },
+          { status: 200 }
+        );
+      }
+    } catch (fetchError) {
+      console.error('Django 백엔드 연결 오류:', fetchError);
+    }
+
+    // Django 백엔드 연결 실패 시 메모리 기반으로 폴백
+    return NextResponse.json(
+      {
+        users: getAllUsers()
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      {
+        users: getAllUsers()
+      },
+      { status: 200 }
+    );
+  }
 }
 
