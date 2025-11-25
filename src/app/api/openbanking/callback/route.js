@@ -16,48 +16,136 @@ export async function POST(request) {
     // 2. 액세스 토큰으로 계좌 목록 조회
     // 3. 계좌 정보 반환
 
-    const clientId = process.env.OPENBANKING_CLIENT_ID || 'test_client_id';
-    const clientSecret = process.env.OPENBANKING_CLIENT_SECRET || 'test_client_secret';
+    const clientId = process.env.OPENBANKING_CLIENT_ID;
+    const clientSecret = process.env.OPENBANKING_CLIENT_SECRET;
+    
+    if (!clientId || !clientSecret) {
+      console.error('오픈뱅킹 인증 정보 누락:', {
+        hasClientId: !!clientId,
+        hasClientSecret: !!clientSecret
+      });
+      return NextResponse.json(
+        { 
+          error: '오픈뱅킹 인증 정보가 설정되지 않았습니다.',
+          message: 'OPENBANKING_CLIENT_ID와 OPENBANKING_CLIENT_SECRET 환경 변수를 확인해주세요.'
+        },
+        { status: 500 }
+      );
+    }
+    
     // 프로덕션 URL을 콜백 URL로 사용 (금융 API는 localhost를 허용하지 않음)
     const redirectUri = process.env.OPENBANKING_REDIRECT_URI 
       || (process.env.NEXT_PUBLIC_APP_URL 
         ? `${process.env.NEXT_PUBLIC_APP_URL}/add/openbanking/callback`
         : 'https://subscription-production-2c3d.up.railway.app/add/openbanking/callback');
+    
+    console.log('오픈뱅킹 콜백 처리 시작:', {
+      hasCode: !!code,
+      hasState: !!state,
+      redirectUri: redirectUri,
+      clientIdPrefix: clientId.substring(0, 10) + '...'
+    });
 
     // 액세스 토큰 교환
+    const tokenParams = new URLSearchParams({
+      code: code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code'
+    });
+
+    console.log('토큰 교환 요청 파라미터:', {
+      code: code.substring(0, 10) + '...',
+      client_id: clientId.substring(0, 10) + '...',
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code'
+    });
+
     const tokenResponse = await fetch('https://testapi.openbanking.or.kr/oauth/2.0/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({
-        code: code,
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code'
-      })
+      body: tokenParams
     });
 
     if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text();
-      console.error('액세스 토큰 교환 실패:', errorText);
+      let errorText = '';
+      let errorJson = null;
+      
+      try {
+        errorText = await tokenResponse.text();
+        console.error('액세스 토큰 교환 실패 (텍스트):', errorText);
+        
+        // JSON 파싱 시도
+        try {
+          errorJson = JSON.parse(errorText);
+          console.error('액세스 토큰 교환 실패 (JSON):', errorJson);
+        } catch (parseError) {
+          console.error('에러 응답이 JSON 형식이 아닙니다:', parseError);
+        }
+      } catch (readError) {
+        console.error('에러 응답 읽기 실패:', readError);
+        errorText = '에러 응답을 읽을 수 없습니다.';
+      }
+      
       console.error('토큰 교환 응답 상태:', tokenResponse.status);
+      console.error('토큰 교환 응답 헤더:', Object.fromEntries(tokenResponse.headers.entries()));
       
       // 에러 응답 반환 (모의 데이터 제거)
       return NextResponse.json(
         { 
           error: '액세스 토큰 교환에 실패했습니다.',
-          message: errorText || '인증 코드가 유효하지 않거나 만료되었습니다.',
-          details: `HTTP ${tokenResponse.status}`
+          message: errorJson?.message || errorJson?.error_description || errorText || '인증 코드가 유효하지 않거나 만료되었습니다.',
+          details: errorJson || { status: tokenResponse.status, raw: errorText },
+          httpStatus: tokenResponse.status
         },
         { status: tokenResponse.status }
       );
     }
 
-    const tokenData = await tokenResponse.json();
+    let tokenData;
+    try {
+      tokenData = await tokenResponse.json();
+      console.log('토큰 교환 성공:', {
+        hasAccessToken: !!tokenData.access_token,
+        hasUserSeqNo: !!tokenData.user_seq_no,
+        tokenType: tokenData.token_type,
+        expiresIn: tokenData.expires_in
+      });
+    } catch (parseError) {
+      console.error('토큰 응답 JSON 파싱 실패:', parseError);
+      const responseText = await tokenResponse.text();
+      console.error('토큰 응답 원본:', responseText);
+      return NextResponse.json(
+        { 
+          error: '토큰 응답을 파싱할 수 없습니다.',
+          message: '오픈뱅킹 API 응답 형식이 올바르지 않습니다.',
+          details: responseText
+        },
+        { status: 500 }
+      );
+    }
+    
     const accessToken = tokenData.access_token;
     const userSeqNo = tokenData.user_seq_no; // 사용자 일련번호
+    
+    if (!accessToken || !userSeqNo) {
+      console.error('토큰 데이터 누락:', {
+        hasAccessToken: !!accessToken,
+        hasUserSeqNo: !!userSeqNo,
+        tokenData: tokenData
+      });
+      return NextResponse.json(
+        { 
+          error: '토큰 정보가 불완전합니다.',
+          message: '액세스 토큰 또는 사용자 일련번호가 응답에 포함되지 않았습니다.',
+          details: tokenData
+        },
+        { status: 500 }
+      );
+    }
 
     // 계좌 목록 조회 (오픈뱅킹 API는 POST 요청 사용)
     const accountsResponse = await fetch('https://testapi.openbanking.or.kr/v2.0/account/list', {
