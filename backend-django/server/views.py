@@ -176,8 +176,10 @@ def subscriptions_list(request):
             # 구독 목록을 JSON 형식으로 변환
             subscriptions_data = []
             for sub in subscriptions:
-                # 다음 결제일 계산
+                # 다음 결제일 계산 및 업데이트
                 next_payment_date = sub.next_payment_date
+                needs_update = False
+                
                 if not next_payment_date and sub.created_at:
                     # 결제일이 없으면 생성일 기준으로 계산
                     created_date = sub.created_at.date()
@@ -195,8 +197,50 @@ def subscriptions_list(request):
                         next_payment_date = datetime(now.year, created_date.month, created_date.day).date()
                         if next_payment_date < now:
                             next_payment_date = datetime(now.year + 1, created_date.month, created_date.day).date()
+                    elif sub.billing_cycle == 'quarterly':
+                        # 3개월 주기 계산
+                        months_to_add = 3
+                        if created_date.month <= 9:
+                            next_payment_date = datetime(created_date.year, created_date.month + months_to_add, created_date.day).date()
+                        else:
+                            next_payment_date = datetime(created_date.year + 1, created_date.month + months_to_add - 12, created_date.day).date()
+                        if next_payment_date < now:
+                            # 다음 분기 계산
+                            months_passed = (now.year - created_date.year) * 12 + (now.month - created_date.month)
+                            quarters_passed = months_passed // 3
+                            next_quarter = quarters_passed + 1
+                            months_to_next = next_quarter * 3
+                            if created_date.month + months_to_next <= 12:
+                                next_payment_date = datetime(created_date.year, created_date.month + months_to_next, created_date.day).date()
+                            else:
+                                next_payment_date = datetime(created_date.year + 1, created_date.month + months_to_next - 12, created_date.day).date()
                     else:
                         next_payment_date = now + timedelta(days=30)
+                    
+                    # 계산한 결제일을 DB에 저장
+                    needs_update = True
+                elif next_payment_date:
+                    # 결제일이 이미 지났으면 다음 결제일로 업데이트
+                    now = timezone.now().date()
+                    if next_payment_date < now:
+                        if sub.billing_cycle == 'monthly':
+                            if next_payment_date.month == 12:
+                                next_payment_date = datetime(next_payment_date.year + 1, 1, next_payment_date.day).date()
+                            else:
+                                next_payment_date = datetime(next_payment_date.year, next_payment_date.month + 1, next_payment_date.day).date()
+                        elif sub.billing_cycle == 'yearly':
+                            next_payment_date = datetime(next_payment_date.year + 1, next_payment_date.month, next_payment_date.day).date()
+                        elif sub.billing_cycle == 'quarterly':
+                            if next_payment_date.month <= 9:
+                                next_payment_date = datetime(next_payment_date.year, next_payment_date.month + 3, next_payment_date.day).date()
+                            else:
+                                next_payment_date = datetime(next_payment_date.year + 1, next_payment_date.month + 3 - 12, next_payment_date.day).date()
+                        needs_update = True
+                
+                # DB 업데이트 (필요한 경우)
+                if needs_update:
+                    sub.next_payment_date = next_payment_date
+                    sub.save(update_fields=['next_payment_date'])
                 
                 subscriptions_data.append({
                     'id': sub.id,
@@ -250,6 +294,32 @@ def subscriptions_list(request):
                     'error': '사용자를 찾을 수 없습니다.'
                 }, status=404)
             
+            # 결제일 계산 (next_payment_date가 없으면 자동 계산)
+            next_payment_date = data.get('next_payment_date')
+            if not next_payment_date:
+                # 생성일 기준으로 결제일 계산
+                now = timezone.now().date()
+                billing_cycle = data.get('billingCycle', 'monthly')
+                
+                if billing_cycle == 'monthly':
+                    # 다음 달 오늘 날짜
+                    if now.month == 12:
+                        next_payment_date = datetime(now.year + 1, 1, now.day).date()
+                    else:
+                        next_payment_date = datetime(now.year, now.month + 1, now.day).date()
+                elif billing_cycle == 'yearly':
+                    # 다음 해 오늘 날짜
+                    next_payment_date = datetime(now.year + 1, now.month, now.day).date()
+                elif billing_cycle == 'quarterly':
+                    # 3개월 후
+                    if now.month <= 9:
+                        next_payment_date = datetime(now.year, now.month + 3, now.day).date()
+                    else:
+                        next_payment_date = datetime(now.year + 1, now.month + 3 - 12, now.day).date()
+                else:
+                    # 기본값: 30일 후
+                    next_payment_date = now + timedelta(days=30)
+            
             # 구독 서비스 생성
             subscription = Subscription.objects.create(
                 user=user,
@@ -262,7 +332,7 @@ def subscriptions_list(request):
                 account_id=data.get('accountId'),
                 account_number=data.get('accountNumber'),
                 bank_code=data.get('bankCode'),
-                next_payment_date=data.get('next_payment_date') if data.get('next_payment_date') else None,
+                next_payment_date=next_payment_date,
             )
             
             return JsonResponse({
@@ -312,9 +382,12 @@ def subscription_detail(request, subscription_id):
         }, status=404)
     
     if request.method == 'GET':
-        # 다음 결제일 계산
+        # 다음 결제일 계산 및 업데이트
         next_payment_date = subscription.next_payment_date
+        needs_update = False
+        
         if not next_payment_date and subscription.created_at:
+            # 결제일이 없으면 생성일 기준으로 계산
             created_date = subscription.created_at.date()
             now = timezone.now().date()
             
@@ -330,8 +403,47 @@ def subscription_detail(request, subscription_id):
                 next_payment_date = datetime(now.year, created_date.month, created_date.day).date()
                 if next_payment_date < now:
                     next_payment_date = datetime(now.year + 1, created_date.month, created_date.day).date()
+            elif subscription.billing_cycle == 'quarterly':
+                # 3개월 주기 계산
+                if created_date.month <= 9:
+                    next_payment_date = datetime(created_date.year, created_date.month + 3, created_date.day).date()
+                else:
+                    next_payment_date = datetime(created_date.year + 1, created_date.month + 3 - 12, created_date.day).date()
+                if next_payment_date < now:
+                    months_passed = (now.year - created_date.year) * 12 + (now.month - created_date.month)
+                    quarters_passed = months_passed // 3
+                    next_quarter = quarters_passed + 1
+                    months_to_next = next_quarter * 3
+                    if created_date.month + months_to_next <= 12:
+                        next_payment_date = datetime(created_date.year, created_date.month + months_to_next, created_date.day).date()
+                    else:
+                        next_payment_date = datetime(created_date.year + 1, created_date.month + months_to_next - 12, created_date.day).date()
             else:
                 next_payment_date = now + timedelta(days=30)
+            
+            needs_update = True
+        elif next_payment_date:
+            # 결제일이 이미 지났으면 다음 결제일로 업데이트
+            now = timezone.now().date()
+            if next_payment_date < now:
+                if subscription.billing_cycle == 'monthly':
+                    if next_payment_date.month == 12:
+                        next_payment_date = datetime(next_payment_date.year + 1, 1, next_payment_date.day).date()
+                    else:
+                        next_payment_date = datetime(next_payment_date.year, next_payment_date.month + 1, next_payment_date.day).date()
+                elif subscription.billing_cycle == 'yearly':
+                    next_payment_date = datetime(next_payment_date.year + 1, next_payment_date.month, next_payment_date.day).date()
+                elif subscription.billing_cycle == 'quarterly':
+                    if next_payment_date.month <= 9:
+                        next_payment_date = datetime(next_payment_date.year, next_payment_date.month + 3, next_payment_date.day).date()
+                    else:
+                        next_payment_date = datetime(next_payment_date.year + 1, next_payment_date.month + 3 - 12, next_payment_date.day).date()
+                needs_update = True
+        
+        # DB 업데이트 (필요한 경우)
+        if needs_update:
+            subscription.next_payment_date = next_payment_date
+            subscription.save(update_fields=['next_payment_date'])
         
         return JsonResponse({
             'subscription': {
