@@ -19,6 +19,10 @@ export default function ProfilePage() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
 
   useEffect(() => {
     // 로그인 상태 확인
@@ -255,6 +259,53 @@ export default function ProfilePage() {
       setEmailError('네트워크 오류가 발생했습니다.');
     } finally {
       setIsUpdatingEmail(false);
+    }
+  };
+
+  const handleSendEmail = async (e) => {
+    e.preventDefault();
+    
+    if (!emailSubject.trim() || !emailMessage.trim()) {
+      alert('제목과 메시지를 모두 입력해주세요.');
+      return;
+    }
+
+    if (!selectedUser) {
+      alert('회원을 선택해주세요.');
+      return;
+    }
+
+    setIsSendingEmail(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/notifications/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          subject: emailSubject.trim(),
+          message: emailMessage.trim()
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(`이메일이 성공적으로 발송되었습니다!\n받는 사람: ${data.email}`);
+        setShowEmailModal(false);
+        setEmailSubject('');
+        setEmailMessage('');
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || '이메일 발송에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('이메일 발송 오류:', error);
+      alert('네트워크 오류가 발생했습니다.');
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -510,6 +561,190 @@ export default function ProfilePage() {
                       </span>
                     </div>
                   )}
+                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+                    <button
+                      onClick={() => setShowEmailModal(true)}
+                      style={{
+                        width: '100%',
+                        background: '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.75rem 1rem',
+                        borderRadius: '6px',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseOver={(e) => e.target.style.background = '#059669'}
+                      onMouseOut={(e) => e.target.style.background = '#10b981'}
+                    >
+                      📧 이메일 알림 보내기
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 이메일 발송 모달 */}
+            {showEmailModal && selectedUser && (
+              <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000
+              }}>
+                <div style={{
+                  background: 'white',
+                  padding: '2rem',
+                  borderRadius: '12px',
+                  width: '90%',
+                  maxWidth: '500px',
+                  maxHeight: '90vh',
+                  overflow: 'auto'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
+                      이메일 알림 발송
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setShowEmailModal(false);
+                        setEmailSubject('');
+                        setEmailMessage('');
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        fontSize: '1.5rem',
+                        cursor: 'pointer',
+                        color: '#6b7280',
+                        padding: 0,
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  
+                  <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f3f4f6', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>받는 사람</div>
+                    <div style={{ fontSize: '1rem', fontWeight: '500', color: '#1f2937' }}>
+                      {selectedUser.name} ({selectedUser.email})
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSendEmail}>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label htmlFor="emailSubject" style={{
+                        display: 'block',
+                        marginBottom: '0.5rem',
+                        color: '#374151',
+                        fontWeight: '500',
+                        fontSize: '0.9rem'
+                      }}>
+                        제목 *
+                      </label>
+                      <input
+                        type="text"
+                        id="emailSubject"
+                        value={emailSubject}
+                        onChange={(e) => setEmailSubject(e.target.value)}
+                        placeholder="이메일 제목을 입력하세요"
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '1rem',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                        required
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <label htmlFor="emailMessage" style={{
+                        display: 'block',
+                        marginBottom: '0.5rem',
+                        color: '#374151',
+                        fontWeight: '500',
+                        fontSize: '0.9rem'
+                      }}>
+                        메시지 *
+                      </label>
+                      <textarea
+                        id="emailMessage"
+                        value={emailMessage}
+                        onChange={(e) => setEmailMessage(e.target.value)}
+                        placeholder="이메일 내용을 입력하세요"
+                        rows={6}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          fontSize: '1rem',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                          resize: 'vertical',
+                          fontFamily: 'inherit'
+                        }}
+                        required
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowEmailModal(false);
+                          setEmailSubject('');
+                          setEmailMessage('');
+                        }}
+                        disabled={isSendingEmail}
+                        style={{
+                          background: '#f3f4f6',
+                          color: '#374151',
+                          border: 'none',
+                          padding: '0.75rem 1.5rem',
+                          borderRadius: '6px',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          cursor: isSendingEmail ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        취소
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSendingEmail}
+                        style={{
+                          background: isSendingEmail ? '#9ca3af' : '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.75rem 1.5rem',
+                          borderRadius: '6px',
+                          fontSize: '0.875rem',
+                          fontWeight: '500',
+                          cursor: isSendingEmail ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        {isSendingEmail ? '발송 중...' : '발송하기'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
             )}

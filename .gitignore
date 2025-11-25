@@ -1,2 +1,21 @@
+<<<<<<< HEAD
 .env
 .env.local
+
+# IntelliJ 설정 파일 (협업 시 충돌 원인)
+.idea/
+*.iml
+
+# 의존성 폴더 (가장 중요)
+node_modules/
+
+# Next.js 빌드 결과물
+.next/
+out/
+build/
+dist/
+
+# 로그 파일
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
