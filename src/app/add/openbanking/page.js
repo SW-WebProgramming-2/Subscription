@@ -286,9 +286,9 @@ export default function OpenBankingPage() {
   const initiateOpenBankingAuth = async (bankCode) => {
     // 프로덕션 URL을 콜백 URL로 사용 (금융 API는 localhost를 허용하지 않음)
     // 환경 변수가 설정되어 있으면 사용하고, 없으면 프로덕션 URL을 기본값으로 사용
-    const callbackUrl = process.env.NEXT_PUBLIC_APP_URL 
-      ? `${process.env.NEXT_PUBLIC_APP_URL}/add/openbanking/callback`
-      : 'https://subscription-production-2c3d.up.railway.app/add/openbanking/callback';
+    // 중요: 인증 요청과 토큰 교환에서 정확히 동일한 redirect_uri를 사용해야 함
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://subscription-production-2c3d.up.railway.app';
+    const callbackUrl = `${baseUrl}/add/openbanking/callback`.replace(/\/$/, '').toLowerCase();
     
     // 실제 구현 시 백엔드 API를 호출하여 오픈뱅킹 인증 URL을 받아옴
     const response = await fetch('/api/openbanking/auth', {

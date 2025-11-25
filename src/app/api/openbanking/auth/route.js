@@ -43,17 +43,26 @@ export async function POST(request) {
     // bank_tran_id 생성 (오픈뱅킹 API 요구사항: 고유한 거래번호)
     const bankTranId = generateBankTranId();
     
+    // redirect_uri 정규화 (끝에 슬래시 제거, 소문자로 통일)
+    // 중요: 인증 요청과 토큰 교환에서 정확히 동일한 redirect_uri를 사용해야 함
+    const normalizedRedirectUri = redirectUri.replace(/\/$/, '').toLowerCase();
+    
     // 오픈뱅킹 인증 URL 생성
     // 오픈뱅킹 API 스펙에 맞게 파라미터 구성
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: clientId,
-      redirect_uri: redirectUri,
+      redirect_uri: normalizedRedirectUri,
       scope: 'login inquiry transfer', // 공백으로 구분된 scope
       state: state,
       auth_type: '0', // 최초인증
       bank_tran_id: bankTranId,
       bank_code_std: bankCode
+    });
+    
+    console.log('오픈뱅킹 인증 URL 생성 (정규화된 redirect_uri):', {
+      originalRedirectUri: redirectUri,
+      normalizedRedirectUri: normalizedRedirectUri
     });
     
     const authUrl = `https://testapi.openbanking.or.kr/oauth/2.0/authorize?${params.toString()}`;

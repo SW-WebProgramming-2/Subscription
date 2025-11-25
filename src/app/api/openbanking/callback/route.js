@@ -34,16 +34,26 @@ export async function POST(request) {
     }
     
     // 프로덕션 URL을 콜백 URL로 사용 (금융 API는 localhost를 허용하지 않음)
-    const redirectUri = process.env.OPENBANKING_REDIRECT_URI 
-      || (process.env.NEXT_PUBLIC_APP_URL 
-        ? `${process.env.NEXT_PUBLIC_APP_URL}/add/openbanking/callback`
-        : 'https://subscription-production-2c3d.up.railway.app/add/openbanking/callback');
+    // 중요: 인증 요청 시 사용한 redirect_uri와 정확히 일치해야 함
+    // 환경 변수가 설정되어 있으면 우선 사용, 없으면 기본값 사용
+    let redirectUri = process.env.OPENBANKING_REDIRECT_URI;
+    
+    if (!redirectUri) {
+      // NEXT_PUBLIC_APP_URL이 있으면 사용, 없으면 프로덕션 URL 사용
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://subscription-production-2c3d.up.railway.app';
+      redirectUri = `${baseUrl}/add/openbanking/callback`;
+    }
+    
+    // redirect_uri 정규화 (끝에 슬래시 제거, 소문자로 통일)
+    redirectUri = redirectUri.replace(/\/$/, '').toLowerCase();
     
     console.log('오픈뱅킹 콜백 처리 시작:', {
       hasCode: !!code,
       hasState: !!state,
       redirectUri: redirectUri,
-      clientIdPrefix: clientId.substring(0, 10) + '...'
+      clientIdPrefix: clientId.substring(0, 10) + '...',
+      envRedirectUri: process.env.OPENBANKING_REDIRECT_URI,
+      envAppUrl: process.env.NEXT_PUBLIC_APP_URL
     });
 
     // 액세스 토큰 교환
@@ -108,11 +118,34 @@ export async function POST(request) {
     let tokenData;
     try {
       tokenData = await tokenResponse.json();
+      console.log('토큰 교환 응답 전체:', JSON.stringify(tokenData, null, 2));
+      
+      // 오픈뱅킹 API는 rsp_code로 성공/실패를 표시할 수 있음
+      if (tokenData.rsp_code && tokenData.rsp_code !== '00000') {
+        console.error('오픈뱅킹 API 에러 응답:', {
+          rsp_code: tokenData.rsp_code,
+          rsp_message: tokenData.rsp_message
+        });
+        return NextResponse.json(
+          { 
+            error: '오픈뱅킹 인증 실패',
+            message: tokenData.rsp_message || '인증 요청이 거부되었습니다.',
+            details: {
+              rsp_code: tokenData.rsp_code,
+              rsp_message: tokenData.rsp_message,
+              fullResponse: tokenData
+            }
+          },
+          { status: 400 }
+        );
+      }
+      
       console.log('토큰 교환 성공:', {
         hasAccessToken: !!tokenData.access_token,
         hasUserSeqNo: !!tokenData.user_seq_no,
         tokenType: tokenData.token_type,
-        expiresIn: tokenData.expires_in
+        expiresIn: tokenData.expires_in,
+        rsp_code: tokenData.rsp_code
       });
     } catch (parseError) {
       console.error('토큰 응답 JSON 파싱 실패:', parseError);
