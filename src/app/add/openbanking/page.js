@@ -83,6 +83,11 @@ export default function OpenBankingPage() {
 
   // 거래 내역 조회
   const fetchTransactions = async (account) => {
+    if (!account || !account.accountId) {
+      console.error('계좌 정보가 올바르지 않습니다:', account);
+      alert('계좌 정보가 올바르지 않습니다.');
+      return;
+    }
     if (!accessToken || !userSeqNo) {
       console.warn('인증 정보가 없어 거래 내역을 조회할 수 없습니다.');
       return;
@@ -105,17 +110,31 @@ export default function OpenBankingPage() {
       });
 
       if (!response.ok) {
-        throw new Error('거래 내역 조회 실패');
+        const errorData = await response.json().catch(() => ({ error: '거래 내역 조회 실패' }));
+        console.error('거래 내역 조회 API 오류:', errorData);
+        throw new Error(errorData.error || errorData.message || '거래 내역 조회 실패');
       }
 
       const data = await response.json();
+      
+      // 에러 응답인 경우 처리
+      if (data.error) {
+        console.error('거래 내역 조회 API 에러 응답:', data);
+        alert(`거래 내역 조회 실패: ${data.error || data.message || '알 수 없는 오류'}`);
+        setTransactions([]);
+        return;
+      }
+      
       setTransactions(data.transactions || []);
       
       // 거래 내역에서 구독 서비스 자동 감지
-      detectSubscriptionFromTransactions(data.transactions || []);
+      if (data.transactions && data.transactions.length > 0) {
+        detectSubscriptionFromTransactions(data.transactions);
+      }
     } catch (error) {
       console.error('거래 내역 조회 오류:', error);
-      // 에러가 발생해도 계속 진행 (거래 내역 없이도 구독 추가 가능)
+      alert(`거래 내역 조회 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`);
+      setTransactions([]);
     } finally {
       setIsLoadingTransactions(false);
     }

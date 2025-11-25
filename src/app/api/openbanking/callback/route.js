@@ -44,31 +44,15 @@ export async function POST(request) {
       console.error('액세스 토큰 교환 실패:', errorText);
       console.error('토큰 교환 응답 상태:', tokenResponse.status);
       
-      // 개발 환경이거나 토큰 교환 실패 시 모의 데이터 반환
-      // 프로덕션에서도 테스트를 위해 모의 데이터 제공
-      const mockAccounts = [
-        {
-          accountId: '1234567890',
-          accountName: 'KB국민은행 입출금통장',
-          accountNumber: '123-456-789012',
-          balance: 1000000,
-          bankCode: '004'
+      // 에러 응답 반환 (모의 데이터 제거)
+      return NextResponse.json(
+        { 
+          error: '액세스 토큰 교환에 실패했습니다.',
+          message: errorText || '인증 코드가 유효하지 않거나 만료되었습니다.',
+          details: `HTTP ${tokenResponse.status}`
         },
-        {
-          accountId: '0987654321',
-          accountName: 'KB국민은행 적금통장',
-          accountNumber: '098-765-432109',
-          balance: 5000000,
-          bankCode: '004'
-        }
-      ];
-
-      console.log('모의 계좌 데이터 반환:', mockAccounts);
-      return NextResponse.json({
-        accounts: mockAccounts,
-        accessToken: 'mock_access_token',
-        userSeqNo: 'mock_user_seq_no'
-      });
+        { status: tokenResponse.status }
+      );
     }
 
     const tokenData = await tokenResponse.json();
@@ -94,79 +78,69 @@ export async function POST(request) {
       console.error('계좌 목록 조회 실패:', errorText);
       console.error('계좌 조회 응답 상태:', accountsResponse.status);
       
-      // 계좌 조회 실패 시에도 모의 데이터 반환 (테스트용)
-      const mockAccounts = [
-        {
-          accountId: '1234567890',
-          accountName: 'KB국민은행 입출금통장',
-          accountNumber: '123-456-789012',
-          balance: 1000000,
-          bankCode: '004'
-        }
-      ];
-      
-      console.log('계좌 조회 실패 - 모의 데이터 반환:', mockAccounts);
-      return NextResponse.json({
-        accounts: mockAccounts,
-        accessToken,
-        userSeqNo
-      });
+      // 에러 응답 반환 (모의 데이터 제거)
+      return NextResponse.json(
+        { 
+          error: '계좌 목록 조회에 실패했습니다.',
+          message: errorText || '계좌 정보를 가져올 수 없습니다.',
+          details: `HTTP ${accountsResponse.status}`,
+          accessToken,
+          userSeqNo
+        },
+        { status: accountsResponse.status }
+      );
     }
 
     const accountsData = await accountsResponse.json();
     
-    console.log('오픈뱅킹 API 계좌 목록 응답:', accountsData);
+    console.log('오픈뱅킹 API 계좌 목록 응답:', JSON.stringify(accountsData, null, 2));
     
-    // 계좌 정보 가공 (API 응답 구조에 맞게 수정)
-    // 오픈뱅킹 API 응답 구조 확인
+    // 계좌 정보 가공 (오픈뱅킹 API 실제 응답 구조에 맞게 수정)
     let accounts = [];
     
+    // 오픈뱅킹 API 응답 구조: res_list 배열 또는 직접 배열
     if (accountsData.res_list && Array.isArray(accountsData.res_list)) {
       accounts = accountsData.res_list.map(account => ({
-        accountId: account.account_num || account.fintech_use_num || account.fintech_use_num,
-        accountName: account.account_name || account.account_holder_name || '',
+        accountId: account.fintech_use_num || account.account_num || '',
+        accountName: account.account_name || account.account_holder_name || account.product_name || '',
         accountNumber: account.account_num_masked || account.account_num || '',
-        balance: parseInt(account.balance_amt || account.balance_amt || '0', 10),
-        bankCode: account.bank_code_std || account.bank_code || ''
+        balance: parseInt(account.balance_amt || account.available_amt || '0', 10),
+        bankCode: account.bank_code_std || account.bank_code || '',
+        bankName: account.bank_name || ''
       }));
     } else if (Array.isArray(accountsData)) {
-      // 응답이 배열인 경우
+      // 응답이 직접 배열인 경우
       accounts = accountsData.map(account => ({
-        accountId: account.account_num || account.fintech_use_num || '',
-        accountName: account.account_name || account.account_holder_name || '',
+        accountId: account.fintech_use_num || account.account_num || '',
+        accountName: account.account_name || account.account_holder_name || account.product_name || '',
         accountNumber: account.account_num_masked || account.account_num || '',
-        balance: parseInt(account.balance_amt || '0', 10),
-        bankCode: account.bank_code_std || account.bank_code || ''
+        balance: parseInt(account.balance_amt || account.available_amt || '0', 10),
+        bankCode: account.bank_code_std || account.bank_code || '',
+        bankName: account.bank_name || ''
+      }));
+    } else if (accountsData.account_list && Array.isArray(accountsData.account_list)) {
+      // account_list로 응답이 오는 경우
+      accounts = accountsData.account_list.map(account => ({
+        accountId: account.fintech_use_num || account.account_num || '',
+        accountName: account.account_name || account.account_holder_name || account.product_name || '',
+        accountNumber: account.account_num_masked || account.account_num || '',
+        balance: parseInt(account.balance_amt || account.available_amt || '0', 10),
+        bankCode: account.bank_code_std || account.bank_code || '',
+        bankName: account.bank_name || ''
       }));
     }
     
     console.log('가공된 계좌 정보:', accounts);
     console.log('가공된 계좌 개수:', accounts.length);
 
-    // 계좌가 없으면 모의 데이터 반환 (테스트용)
+    // 계좌가 없으면 빈 배열 반환 (모의 데이터 제거)
     if (accounts.length === 0) {
-      console.log('계좌가 없어 모의 데이터 반환');
-      const mockAccounts = [
-        {
-          accountId: '1234567890',
-          accountName: 'KB국민은행 입출금통장',
-          accountNumber: '123-456-789012',
-          balance: 1000000,
-          bankCode: '004'
-        },
-        {
-          accountId: '0987654321',
-          accountName: 'KB국민은행 적금통장',
-          accountNumber: '098-765-432109',
-          balance: 5000000,
-          bankCode: '004'
-        }
-      ];
-      
+      console.log('계좌가 없습니다. 빈 배열을 반환합니다.');
       return NextResponse.json({
-        accounts: mockAccounts,
+        accounts: [],
         accessToken,
-        userSeqNo
+        userSeqNo,
+        message: '연동된 계좌가 없습니다.'
       });
     }
 
@@ -178,28 +152,12 @@ export async function POST(request) {
   } catch (error) {
     console.error('오픈뱅킹 콜백 처리 오류:', error);
     
-    // 개발 환경에서는 모의 데이터 반환
-    if (process.env.NODE_ENV === 'development') {
-      const mockAccounts = [
-        {
-          accountId: '1234567890',
-          accountName: 'KB국민은행 입출금통장',
-          accountNumber: '123-456-789012',
-          balance: 1000000,
-          bankCode: '004'
-        }
-      ];
-
-      return NextResponse.json({
-        accounts: mockAccounts,
-        accessToken: 'mock_access_token'
-      });
-    }
-
+    // 에러 응답 반환 (모의 데이터 제거)
     return NextResponse.json(
       { 
         error: '오픈뱅킹 콜백 처리 중 오류가 발생했습니다.',
-        message: error.message || '알 수 없는 오류'
+        message: error.message || '알 수 없는 오류',
+        details: error.stack
       },
       { status: 500 }
     );

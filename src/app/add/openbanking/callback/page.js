@@ -39,10 +39,18 @@ export default function OpenBankingCallback() {
       });
 
       if (!response.ok) {
-        throw new Error('오픈뱅킹 연동 실패');
+        const errorData = await response.json().catch(() => ({ error: '오픈뱅킹 연동 실패' }));
+        console.error('오픈뱅킹 콜백 API 오류:', errorData);
+        throw new Error(errorData.error || errorData.message || '오픈뱅킹 연동 실패');
       }
 
       const data = await response.json();
+      
+      // 에러 응답인 경우 처리
+      if (data.error) {
+        console.error('오픈뱅킹 API 에러 응답:', data);
+        throw new Error(data.error || data.message || '오픈뱅킹 연동 중 오류가 발생했습니다.');
+      }
       
       console.log('콜백에서 받은 데이터:', {
         hasAccounts: !!data.accounts,

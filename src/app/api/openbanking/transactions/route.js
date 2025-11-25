@@ -43,52 +43,49 @@ export async function POST(request) {
     if (!transactionsResponse.ok) {
       const errorText = await transactionsResponse.text();
       console.error('거래 내역 조회 실패:', errorText);
+      console.error('거래 내역 조회 응답 상태:', transactionsResponse.status);
       
-      // 개발 환경에서는 모의 데이터 반환
-      if (process.env.NODE_ENV === 'development') {
-        const mockTransactions = [
-          {
-            tran_date: today.toISOString().split('T')[0].replace(/-/g, ''),
-            tran_time: '120000',
-            inout_type: '2', // 1: 입금, 2: 출금
-            print_content: 'Netflix',
-            tran_amt: '13500',
-            after_balance_amt: '986500',
-            branch_name: '인터넷뱅킹'
-          },
-          {
-            tran_date: oneMonthAgo.toISOString().split('T')[0].replace(/-/g, ''),
-            tran_time: '150000',
-            inout_type: '2',
-            print_content: 'Spotify',
-            tran_amt: '10900',
-            after_balance_amt: '1000000',
-            branch_name: '인터넷뱅킹'
-          }
-        ];
-
-        return NextResponse.json({
-          transactions: mockTransactions,
-          totalCount: mockTransactions.length
-        });
-      }
-
-      throw new Error(`거래 내역 조회 실패: ${transactionsResponse.status}`);
+      // 에러 응답 반환 (모의 데이터 제거)
+      return NextResponse.json(
+        { 
+          error: '거래 내역 조회에 실패했습니다.',
+          message: errorText || '거래 내역을 가져올 수 없습니다.',
+          details: `HTTP ${transactionsResponse.status}`
+        },
+        { status: transactionsResponse.status }
+      );
     }
 
     const transactionsData = await transactionsResponse.json();
+    console.log('오픈뱅킹 API 거래 내역 응답:', JSON.stringify(transactionsData, null, 2));
     
-    // 거래 내역 정보 가공
-    const transactions = (transactionsData.res_list || []).map(transaction => ({
-      date: transaction.tran_date,
-      time: transaction.tran_time,
-      type: transaction.inout_type === '1' ? '입금' : '출금',
-      amount: parseInt(transaction.tran_amt || '0', 10),
-      balance: parseInt(transaction.after_balance_amt || '0', 10),
-      description: transaction.print_content || transaction.tran_amt_content || '',
-      counterparty: transaction.account_holder_name || '',
-      branch: transaction.branch_name || ''
-    }));
+    // 거래 내역 정보 가공 (오픈뱅킹 API 실제 응답 구조에 맞게 수정)
+    let transactions = [];
+    
+    if (transactionsData.res_list && Array.isArray(transactionsData.res_list)) {
+      transactions = transactionsData.res_list.map(transaction => ({
+        date: transaction.tran_date || '',
+        time: transaction.tran_time || '',
+        type: transaction.inout_type === '1' || transaction.inout_type === '입금' ? '입금' : '출금',
+        amount: parseInt(transaction.tran_amt || '0', 10),
+        balance: parseInt(transaction.after_balance_amt || transaction.balance_amt || '0', 10),
+        description: transaction.print_content || transaction.tran_amt_content || transaction.remittance_info || '',
+        counterparty: transaction.account_holder_name || transaction.counterparty_name || '',
+        branch: transaction.branch_name || ''
+      }));
+    } else if (Array.isArray(transactionsData)) {
+      // 응답이 직접 배열인 경우
+      transactions = transactionsData.map(transaction => ({
+        date: transaction.tran_date || '',
+        time: transaction.tran_time || '',
+        type: transaction.inout_type === '1' || transaction.inout_type === '입금' ? '입금' : '출금',
+        amount: parseInt(transaction.tran_amt || '0', 10),
+        balance: parseInt(transaction.after_balance_amt || transaction.balance_amt || '0', 10),
+        description: transaction.print_content || transaction.tran_amt_content || transaction.remittance_info || '',
+        counterparty: transaction.account_holder_name || transaction.counterparty_name || '',
+        branch: transaction.branch_name || ''
+      }));
+    }
 
     return NextResponse.json({
       transactions,
@@ -99,31 +96,12 @@ export async function POST(request) {
   } catch (error) {
     console.error('거래 내역 조회 오류:', error);
     
-    // 개발 환경에서는 모의 데이터 반환
-    if (process.env.NODE_ENV === 'development') {
-      const mockTransactions = [
-        {
-          date: new Date().toISOString().split('T')[0].replace(/-/g, ''),
-          time: '120000',
-          type: '출금',
-          amount: 13500,
-          balance: 986500,
-          description: 'Netflix',
-          counterparty: '',
-          branch: '인터넷뱅킹'
-        }
-      ];
-
-      return NextResponse.json({
-        transactions: mockTransactions,
-        totalCount: mockTransactions.length
-      });
-    }
-
+    // 에러 응답 반환 (모의 데이터 제거)
     return NextResponse.json(
       { 
         error: '거래 내역 조회 중 오류가 발생했습니다.',
-        message: error.message || '알 수 없는 오류'
+        message: error.message || '알 수 없는 오류',
+        details: error.stack
       },
       { status: 500 }
     );
