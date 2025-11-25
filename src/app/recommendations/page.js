@@ -2,6 +2,27 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    ArcElement,
+    Title,
+    Tooltip,
+    Legend,
+} from 'chart.js';
+import { Bar, Doughnut } from 'react-chartjs-2';
+
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    ArcElement,
+    Title,
+    Tooltip,
+    Legend
+);
 
 export default function RecommedPage() {
     const router = useRouter();
@@ -9,10 +30,117 @@ export default function RecommedPage() {
     const [recommendations, setRecommendations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [preferenceData, setPreferenceData] = useState(null);
 
     useEffect(() => {
         fetchRecommendationData();
+        calculatePreferenceData();
     }, []);
+
+    // 설문 결과를 기반으로 선호도 계산
+    const calculatePreferenceData = () => {
+        // 설문 데이터 조회 로직 (Django DB 미구현 상태이므로 주석 처리)
+        /*
+        try {
+            const response = await fetch('/api/survey/get', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('설문 데이터를 불러오는데 실패했습니다.');
+            }
+
+            const data = await response.json();
+            if (data.success && data.surveyData) {
+                const preferences = calculatePreferences(data.surveyData.answers);
+                setPreferenceData(preferences);
+            }
+        } catch (error) {
+            console.error('설문 데이터 로딩 오류:', error);
+            // 오류 발생 시 더미 데이터 사용
+            setPreferenceData(getDummyPreferenceData());
+        }
+        */
+
+        // 임시로 로컬 스토리지에서 가져오기
+        try {
+            const savedData = localStorage.getItem('surveyAnswers');
+            if (savedData) {
+                const surveyData = JSON.parse(savedData);
+                const preferences = calculatePreferences(surveyData.answers);
+                setPreferenceData(preferences);
+            } else {
+                // 설문 데이터가 없으면 더미 데이터 사용
+                setPreferenceData(getDummyPreferenceData());
+            }
+        } catch (error) {
+            console.error('설문 데이터 로딩 오류:', error);
+            setPreferenceData(getDummyPreferenceData());
+        }
+    };
+
+    // 설문 답변을 기반으로 선호도 계산
+    const calculatePreferences = (answers) => {
+        const categoryMapping = {
+            '스트리밍': 'streaming_preference',
+            '음악': 'music_preference',
+            '소프트웨어': 'software_preference',
+            '게임': 'game_preference',
+            '클라우드': 'cloud_preference',
+            '뉴스/잡지': 'news_preference',
+            '피트니스': 'fitness_preference',
+            '교육': 'education_preference',
+            '기타': 'preferred_category'
+        };
+
+        const preferenceScores = {
+            '매우 높음': 5,
+            '높음': 4,
+            '보통': 3,
+            '낮음': 2,
+            '매우 낮음': 1
+        };
+
+        const preferences = {};
+        const categories = Object.keys(categoryMapping);
+
+        categories.forEach(category => {
+            const questionId = categoryMapping[category];
+            if (answers[questionId]) {
+                const answer = answers[questionId];
+                if (preferenceScores[answer] !== undefined) {
+                    preferences[category] = preferenceScores[answer];
+                } else if (answer === category) {
+                    // preferred_category 질문의 경우
+                    preferences[category] = 5;
+                } else {
+                    preferences[category] = 3; // 기본값
+                }
+            } else {
+                preferences[category] = 3; // 기본값
+            }
+        });
+
+        return preferences;
+    };
+
+    // 더미 선호도 데이터 생성
+    const getDummyPreferenceData = () => {
+        return {
+            '스트리밍': 4,
+            '음악': 3,
+            '소프트웨어': 4,
+            '게임': 2,
+            '클라우드': 3,
+            '뉴스/잡지': 2,
+            '피트니스': 3,
+            '교육': 4,
+            '기타': 2
+        };
+    };
 
     const fetchRecommendationData = async () => {
         try {
@@ -314,27 +442,201 @@ export default function RecommedPage() {
                             marginBottom: '2rem',
                             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
                         }}>
-                            <h2 style={{
-                                fontSize: '1.5rem',
-                                fontWeight: 'bold',
-                                marginBottom: '1.5rem',
-                                color: '#1f2937'
-                            }}>
-                                설문 기반 개인 선호도
-                            </h2>
-                            <div style={{
-                                minHeight: '300px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: '#f9fafb',
-                                borderRadius: '8px',
-                                border: '2px dashed #d1d5db',
-                                color: '#9ca3af',
-                                fontSize: '1.125rem'
-                            }}>
-                                그래프가 들어갈 자리
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                <h2 style={{
+                                    fontSize: '1.5rem',
+                                    fontWeight: 'bold',
+                                    marginBottom: '1.5rem',
+                                    color: '#1f2937'
+                                }}>
+                                    설문 기반 개인 선호도
+                                </h2>
+                                <a
+                                    href="/survey"
+                                    style={{
+                                        color: '#667eea',
+                                        textDecoration: 'none',
+                                        fontWeight: '600',
+                                        marginTop: '1rem'
+                                    }}
+                                >
+                                    설문조사 참여하기 →
+                                </a>
                             </div>
+
+                            {preferenceData ? (
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '1fr 1fr',
+                                    gap: '2rem',
+                                    marginBottom: '2rem'
+                                }}>
+                                    {/* 바 차트 */}
+                                    <div>
+                                        <h3 style={{
+                                            fontSize: '1.125rem',
+                                            fontWeight: '600',
+                                            marginBottom: '1rem',
+                                            color: '#1f2937'
+                                        }}>
+                                            카테고리별 선호도
+                                        </h3>
+                                        <div style={{ height: '300px' }}>
+                                            <Bar
+                                                data={{
+                                                    labels: Object.keys(preferenceData),
+                                                    datasets: [{
+                                                        label: '선호도 점수',
+                                                        data: Object.values(preferenceData),
+                                                        backgroundColor: [
+                                                            'rgba(102, 126, 234, 0.8)',
+                                                            'rgba(118, 75, 162, 0.8)',
+                                                            'rgba(59, 130, 246, 0.8)',
+                                                            'rgba(16, 185, 129, 0.8)',
+                                                            'rgba(245, 158, 11, 0.8)',
+                                                            'rgba(239, 68, 68, 0.8)',
+                                                            'rgba(139, 92, 246, 0.8)',
+                                                            'rgba(236, 72, 153, 0.8)',
+                                                            'rgba(34, 197, 94, 0.8)'
+                                                        ],
+                                                        borderColor: [
+                                                            'rgba(102, 126, 234, 1)',
+                                                            'rgba(118, 75, 162, 1)',
+                                                            'rgba(59, 130, 246, 1)',
+                                                            'rgba(16, 185, 129, 1)',
+                                                            'rgba(245, 158, 11, 1)',
+                                                            'rgba(239, 68, 68, 1)',
+                                                            'rgba(139, 92, 246, 1)',
+                                                            'rgba(236, 72, 153, 1)',
+                                                            'rgba(34, 197, 94, 1)'
+                                                        ],
+                                                        borderWidth: 1
+                                                    }]
+                                                }}
+                                                options={{
+                                                    responsive: true,
+                                                    maintainAspectRatio: false,
+                                                    plugins: {
+                                                        legend: {
+                                                            display: false
+                                                        },
+                                                        tooltip: {
+                                                            callbacks: {
+                                                                label: function(context) {
+                                                                    const score = context.parsed.y;
+                                                                    const labels = ['매우 낮음', '낮음', '보통', '높음', '매우 높음'];
+                                                                    return `선호도: ${labels[score - 1]} (${score}/5)`;
+                                                                }
+                                                            }
+                                                        }
+                                                    },
+                                                    scales: {
+                                                        y: {
+                                                            beginAtZero: true,
+                                                            max: 5,
+                                                            ticks: {
+                                                                stepSize: 1,
+                                                                callback: function(value) {
+                                                                    const labels = ['', '매우 낮음', '낮음', '보통', '높음', '매우 높음'];
+                                                                    return labels[value] || '';
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* 도넛 차트 */}
+                                    <div>
+                                        <h3 style={{
+                                            fontSize: '1.125rem',
+                                            fontWeight: '600',
+                                            marginBottom: '1rem',
+                                            color: '#1f2937'
+                                        }}>
+                                            선호도 분포
+                                        </h3>
+                                        <div style={{ height: '300px' }}>
+                                            <Doughnut
+                                                data={{
+                                                    labels: Object.keys(preferenceData),
+                                                    datasets: [{
+                                                        label: '선호도 점수',
+                                                        data: Object.values(preferenceData),
+                                                        backgroundColor: [
+                                                            'rgba(102, 126, 234, 0.8)',
+                                                            'rgba(118, 75, 162, 0.8)',
+                                                            'rgba(59, 130, 246, 0.8)',
+                                                            'rgba(16, 185, 129, 0.8)',
+                                                            'rgba(245, 158, 11, 0.8)',
+                                                            'rgba(239, 68, 68, 0.8)',
+                                                            'rgba(139, 92, 246, 0.8)',
+                                                            'rgba(236, 72, 153, 0.8)',
+                                                            'rgba(34, 197, 94, 0.8)'
+                                                        ],
+                                                        borderColor: [
+                                                            'rgba(102, 126, 234, 1)',
+                                                            'rgba(118, 75, 162, 1)',
+                                                            'rgba(59, 130, 246, 1)',
+                                                            'rgba(16, 185, 129, 1)',
+                                                            'rgba(245, 158, 11, 1)',
+                                                            'rgba(239, 68, 68, 1)',
+                                                            'rgba(139, 92, 246, 1)',
+                                                            'rgba(236, 72, 153, 1)',
+                                                            'rgba(34, 197, 94, 1)'
+                                                        ],
+                                                        borderWidth: 2
+                                                    }]
+                                                }}
+                                                options={{
+                                                    responsive: true,
+                                                    maintainAspectRatio: false,
+                                                    plugins: {
+                                                        legend: {
+                                                            position: 'right',
+                                                            labels: {
+                                                                boxWidth: 12,
+                                                                padding: 10,
+                                                                font: {
+                                                                    size: 11
+                                                                }
+                                                            }
+                                                        },
+                                                        tooltip: {
+                                                            callbacks: {
+                                                                label: function(context) {
+                                                                    const score = context.parsed;
+                                                                    const labels = ['매우 낮음', '낮음', '보통', '높음', '매우 높음'];
+                                                                    return `${context.label}: ${labels[score - 1]} (${score}/5)`;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{
+                                    minHeight: '300px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: '#f9fafb',
+                                    borderRadius: '8px',
+                                    border: '2px dashed #d1d5db',
+                                    color: '#9ca3af',
+                                    fontSize: '1.125rem',
+                                    padding: '2rem'
+                                }}>
+                                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
+                                    <div style={{ marginBottom: '0.5rem' }}>설문 데이터가 없습니다.</div>
+                                </div>
+                            )}
                         </section>
 
                         {/* QnA 페이지 이동 버튼 */}

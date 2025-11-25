@@ -7,7 +7,7 @@
  * 카테고리별 추천 서비스 더미 데이터
  * 실제 프로덕션에서는 데이터베이스나 외부 API에서 가져올 수 있습니다.
  */
-const RECOMMENDATION_DATABASE = {
+export const RECOMMENDATION_DATABASE = {
   '스트리밍': [
     { name: 'Netflix', price: 13500, description: '다양한 영화와 시리즈를 제공하는 글로벌 스트리밍 서비스' },
     { name: 'Disney+', price: 9900, description: '디즈니, 마블, 스타워즈 콘텐츠 전문 스트리밍 서비스' },
