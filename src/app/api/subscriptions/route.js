@@ -130,21 +130,22 @@ export async function GET(request) {
       const user = sub.userId ? getUserById(sub.userId) : null;
       const username = user ? user.username : null;
       
-      return {
-        id: sub.id,
-        name: sub.name,
-        price: sub.price,
-        billingCycle: sub.billingCycle || 'monthly',
-        category: sub.category || '기타',
-        next_payment_date: nextPaymentDate ? nextPaymentDate.toISOString().split('T')[0] : null,
-        userId: sub.userId, // 사용자 ID 포함
-        username: username, // 사용자 이름 포함
-        // 오픈뱅킹 정보도 포함
-        accountId: sub.accountId || null,
-        accountNumber: sub.accountNumber || null,
-        bankCode: sub.bankCode || null,
-        createdAt: sub.createdAt
-      };
+        return {
+          id: sub.id,
+          name: sub.name,
+          price: sub.price,
+          billingCycle: sub.billingCycle || 'monthly',
+          category: sub.category || '기타',
+          next_payment_date: sub.nextPaymentDate || (nextPaymentDate ? nextPaymentDate.toISOString().split('T')[0] : null),
+          description: sub.description || '',
+          userId: sub.userId, // 사용자 ID 포함
+          username: username, // 사용자 이름 포함
+          // 오픈뱅킹 정보도 포함
+          accountId: sub.accountId || null,
+          accountNumber: sub.accountNumber || null,
+          bankCode: sub.bankCode || null,
+          createdAt: sub.createdAt
+        };
     });
     
     return NextResponse.json({ subscriptions: formattedSubscriptions }, { status: 200 });
@@ -168,7 +169,7 @@ export async function POST(request) {
         // 개발 환경: 임시 사용자 ID 사용
         const tempAuth = { authorized: true, userId: 'temp_user_1', isAdmin: false };
         const body = await request.json();
-        const { name, price, billingCycle, category, accountId, accountNumber, bankCode } = body;
+        const { name, price, billingCycle, category, nextPaymentDate, description, accountId, accountNumber, bankCode } = body;
 
         if (!name || !price) {
           return NextResponse.json(
@@ -183,6 +184,8 @@ export async function POST(request) {
           price: parseFloat(price),
           billingCycle: billingCycle || 'monthly',
           category: category || '',
+          nextPaymentDate: nextPaymentDate || null,
+          description: description || '',
           accountId: accountId || null,
           accountNumber: accountNumber || null,
           bankCode: bankCode || null
@@ -204,7 +207,7 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { name, price, billingCycle, category, accountId, accountNumber, bankCode } = body;
+    const { name, price, billingCycle, category, nextPaymentDate, description, accountId, accountNumber, bankCode } = body;
 
     if (!name || !price) {
       return NextResponse.json(
@@ -220,7 +223,9 @@ export async function POST(request) {
       price: parseFloat(price),
       billingCycle: billingCycle || 'monthly',
       category: category || '',
-      // 오픈뱅킹 정보
+      nextPaymentDate: nextPaymentDate || null,
+      description: description || '',
+      // 오픈뱅킹 정보 (선택사항)
       accountId: accountId || null,
       accountNumber: accountNumber || null,
       bankCode: bankCode || null
