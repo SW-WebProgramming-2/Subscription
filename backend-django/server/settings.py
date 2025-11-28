@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'server',  # 서버 앱 추가
 ]
 
 MIDDLEWARE = [
@@ -94,6 +95,9 @@ STATIC_URL = 'static/'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Custom User Model
+AUTH_USER_MODEL = 'server.User'
 
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True

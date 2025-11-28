@@ -44,16 +44,48 @@ export default function OpenBankingCallback() {
 
       const data = await response.json();
       
+      console.log('콜백에서 받은 데이터:', {
+        hasAccounts: !!data.accounts,
+        accountsCount: data.accounts?.length || 0,
+        hasToken: !!data.accessToken,
+        hasUserSeqNo: !!data.userSeqNo,
+        fullData: data // 전체 데이터 확인
+      });
+      
       // 계좌 정보와 인증 정보를 세션 스토리지에 저장
-      sessionStorage.setItem('openbankingAccounts', JSON.stringify(data.accounts));
+      // accounts가 빈 배열이어도 저장 (나중에 확인 가능하도록)
+      if (data.accounts) {
+        sessionStorage.setItem('openbankingAccounts', JSON.stringify(data.accounts));
+        console.log('계좌 정보 저장 완료:', data.accounts);
+      } else {
+        console.warn('계좌 정보가 없습니다. 빈 배열로 저장합니다.');
+        sessionStorage.setItem('openbankingAccounts', JSON.stringify([]));
+      }
+      
       if (data.accessToken) {
         sessionStorage.setItem('openbankingAccessToken', data.accessToken);
+        console.log('AccessToken 저장 완료');
       }
+      
       if (data.userSeqNo) {
         sessionStorage.setItem('openbankingUserSeqNo', data.userSeqNo);
+        console.log('UserSeqNo 저장 완료:', data.userSeqNo);
       }
+      
+      // 저장 확인
+      const savedAccounts = sessionStorage.getItem('openbankingAccounts');
+      const savedToken = sessionStorage.getItem('openbankingAccessToken');
+      const savedUserSeqNo = sessionStorage.getItem('openbankingUserSeqNo');
+      
+      console.log('저장 확인:', {
+        savedAccounts: !!savedAccounts,
+        savedToken: !!savedToken,
+        savedUserSeqNo: !!savedUserSeqNo
+      });
+      
       setStatus('success');
       
+      // 세션 스토리지 저장이 완료된 후 리다이렉트
       setTimeout(() => {
         router.push('/add/openbanking');
       }, 2000);

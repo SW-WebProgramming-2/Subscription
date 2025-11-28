@@ -1,4 +1,27 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
 export default function Home() {
+  const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // 로그인 상태 확인
+    const token = localStorage.getItem('authToken');
+    setIsLoggedIn(!!token);
+    setIsLoading(false);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    setIsLoggedIn(false);
+    router.push('/');
+  };
+
   return (
     <div style={{ 
       minHeight: '100vh', 
@@ -35,33 +58,73 @@ export default function Home() {
         </div>
         
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-          <a href="#" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>구독 조회</a>
+          <a href="/subscriptions" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>구독 조회</a>
           <a href="/recommendations" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>AI 추천</a>
         </div>
         
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button style={{
-            background: 'transparent',
-            color: '#6b7280',
-            border: 'none',
-            padding: '0.5rem 1rem',
-            borderRadius: '6px',
-            fontWeight: '500',
-            cursor: 'pointer'
-          }}>
-            로그인
-          </button>
-          <button style={{
-            background: '#667eea',
-            color: 'white',
-            border: 'none',
-            padding: '0.5rem 1rem',
-            borderRadius: '6px',
-            fontWeight: '500',
-            cursor: 'pointer'
-          }}>
-            회원가입
-          </button>
+          {isLoading ? (
+            <div style={{ color: '#6b7280' }}>로딩 중...</div>
+          ) : isLoggedIn ? (
+            <>
+              <a href="/profile" style={{
+                background: '#667eea',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'inline-block'
+              }}>
+                회원 정보 조회
+              </a>
+              <button
+                onClick={handleLogout}
+                style={{
+                  background: 'transparent',
+                  color: '#6b7280',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                로그아웃
+              </button>
+            </>
+          ) : (
+            <>
+              <a href="/login" style={{
+                background: 'transparent',
+                color: '#6b7280',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'inline-block'
+              }}>
+                로그인
+              </a>
+              <a href="/signup" style={{
+                background: '#667eea',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'inline-block'
+              }}>
+                회원가입
+              </a>
+            </>
+          )}
         </div>
       </nav>
 
@@ -279,11 +342,10 @@ export default function Home() {
             <div>
               <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1.5rem' }}>서비스</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {['구독 관리', '대시보드', 'AI 추천', '지출 분석'].map((item, index) => (
-                  <a key={index} href="#" style={{ color: '#d1d5db', textDecoration: 'none', fontSize: '0.95rem' }}>
-                    {item}
-                  </a>
-                ))}
+                <a href="/subscriptions" style={{ color: '#d1d5db', textDecoration: 'none', fontSize: '0.95rem' }}>구독 관리</a>
+                <a href="#" style={{ color: '#d1d5db', textDecoration: 'none', fontSize: '0.95rem' }}>대시보드</a>
+                <a href="#" style={{ color: '#d1d5db', textDecoration: 'none', fontSize: '0.95rem' }}>AI 추천</a>
+                <a href="#" style={{ color: '#d1d5db', textDecoration: 'none', fontSize: '0.95rem' }}>지출 분석</a>
               </div>
             </div>
             
