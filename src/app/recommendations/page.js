@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Chart as ChartJS,
@@ -73,12 +73,12 @@ export default function RecommedPage() {
                 const preferences = calculatePreferences(surveyData.answers);
                 setPreferenceData(preferences);
             } else {
-                // 설문 데이터가 없으면 더미 데이터 사용
-                setPreferenceData(getDummyPreferenceData());
+                // 설문 데이터가 없으면 null로 설정
+                setPreferenceData(null);
             }
         } catch (error) {
             console.error('설문 데이터 로딩 오류:', error);
-            setPreferenceData(getDummyPreferenceData());
+            setPreferenceData(null);
         }
     };
 
@@ -127,19 +127,36 @@ export default function RecommedPage() {
         return preferences;
     };
 
-    // 더미 선호도 데이터 생성
-    const getDummyPreferenceData = () => {
-        return {
-            '스트리밍': 4,
-            '음악': 3,
-            '소프트웨어': 4,
-            '게임': 2,
-            '클라우드': 3,
-            '뉴스/잡지': 2,
-            '피트니스': 3,
-            '교육': 4,
-            '기타': 2
-        };
+    // 구독 서비스 데이터 확인
+    const checkSubscriptionData = async (userId) => {
+        try {
+            const DJANGO_API_BASE_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000/api';
+            const url = `${DJANGO_API_BASE_URL}/subscriptions/${userId}/`;
+            
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                // 404는 데이터가 없는 것으로 간주
+                if (response.status === 404) {
+                    return { hasData: false, subscriptions: [] };
+                }
+                throw new Error(`구독 서비스 데이터 확인 실패: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            const subscriptions = data.subscriptions || data || [];
+            
+            return { hasData: subscriptions.length > 0, subscriptions };
+        } catch (err) {
+            console.error('구독 서비스 데이터 확인 오류:', err);
+            // 네트워크 오류 등은 데이터가 있다고 가정하고 API 호출을 시도
+            return { hasData: true, subscriptions: null, error: err.message };
+        }
     };
 
     const fetchRecommendationData = async () => {
@@ -147,6 +164,20 @@ export default function RecommedPage() {
             setLoading(true);
             setError(null);
             
+            const userId = '1';
+            
+            // 먼저 구독 서비스 데이터가 있는지 확인
+            const subscriptionCheck = await checkSubscriptionData(userId);
+            
+            // 구독 서비스 데이터가 없으면 API를 호출하지 않음
+            if (!subscriptionCheck.hasData) {
+                setCategories([]);
+                setRecommendations([]);
+                setLoading(false);
+                return;
+            }
+            
+            // 구독 서비스 데이터가 있으면 API 호출
             const response = await fetch('/api/gemini', {
                 method: 'POST',
                 headers: {
@@ -154,7 +185,7 @@ export default function RecommedPage() {
                 },
                 body: JSON.stringify({
                     text: '',
-                    userId: '1'
+                    userId: userId
                 })
             });
 
@@ -168,11 +199,15 @@ export default function RecommedPage() {
                 setCategories(data.categories || []);
                 setRecommendations(data.recommendations || []);
             } else {
+                // API 오류 발생 시 오류 메시지 표시
                 throw new Error(data.error || '데이터 처리 중 오류가 발생했습니다.');
             }
         } catch (err) {
             console.error('추천 데이터 로딩 오류:', err);
             setError(err.message);
+            // 오류 발생 시 데이터 초기화
+            setCategories([]);
+            setRecommendations([]);
         } finally {
             setLoading(false);
         }
@@ -337,7 +372,7 @@ export default function RecommedPage() {
                                 </div>
                             ) : (
                                 <div style={{ color: '#6b7280', textAlign: 'center', padding: '2rem' }}>
-                                    분석할 카테고리 데이터가 없습니다.
+                                    아직 데이터가 존재하지 않습니다.
                                 </div>
                             )}
                         </section>
@@ -429,7 +464,7 @@ export default function RecommedPage() {
                                 </div>
                             ) : (
                                 <div style={{ color: '#6b7280', textAlign: 'center', padding: '2rem' }}>
-                                    추천할 구독 서비스가 없습니다.
+                                    아직 데이터가 존재하지 않습니다.
                                 </div>
                             )}
                         </section>
@@ -634,7 +669,7 @@ export default function RecommedPage() {
                                     padding: '2rem'
                                 }}>
                                     <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
-                                    <div style={{ marginBottom: '0.5rem' }}>설문 데이터가 없습니다.</div>
+                                    <div style={{ marginBottom: '0.5rem' }}>데이터가 없습니다. 설문조사를 진행해주세요.</div>
                                 </div>
                             )}
                         </section>
