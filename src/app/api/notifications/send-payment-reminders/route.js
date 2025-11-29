@@ -34,13 +34,24 @@ async function sendEmail(to, subject, text, html) {
 }
 
 // 결제일 계산 함수 (구독 추가 시 로직과 동일)
+// - 사용자가 직접 입력한 nextPaymentDate가 있으면 그 값을 우선 사용
+// - 없으면 createdAt + billingCycle 로직으로 계산
 function calculateNextPaymentDate(subscription) {
+  const now = new Date();
+
+  // 1순위: 사용자가 지정한 다음 결제일
+  if (subscription.nextPaymentDate) {
+    const baseDate = new Date(subscription.nextPaymentDate);
+    baseDate.setHours(0, 0, 0, 0);
+    return baseDate;
+  }
+
+  // 2순위: createdAt 기반 기존 로직 (하위 호환용)
   if (!subscription.createdAt) {
     return null;
   }
 
   const createdDate = new Date(subscription.createdAt);
-  const now = new Date();
 
   let nextPaymentDate = null;
 
