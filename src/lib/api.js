@@ -206,6 +206,26 @@ export const notificationAPI = {
   // 알림 히스토리
   getNotificationHistory: (userId) =>
     apiClient.get(`/notifications/history?userId=${userId}`),
+
+  // 회원에게 이메일 알림 발송
+  sendEmailNotification: (userId, subject, message) => {
+    const token = localStorage.getItem('authToken');
+    return fetch('/api/notifications/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      },
+      body: JSON.stringify({ userId, subject, message })
+    }).then(res => {
+      if (!res.ok) {
+        return res.json().then(err => {
+          throw new Error(err.error || `HTTP error! status: ${res.status}`);
+        });
+      }
+      return res.json();
+    });
+  },
 };
 
 // 사용자 설정 API

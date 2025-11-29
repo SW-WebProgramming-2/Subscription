@@ -178,7 +178,7 @@ export async function POST(request) {
           );
         }
 
-        const subscription = addSubscription({
+        const subscriptionData = {
           userId: tempAuth.userId,
           name,
           price: parseFloat(price),
@@ -189,7 +189,15 @@ export async function POST(request) {
           accountId: accountId || null,
           accountNumber: accountNumber || null,
           bankCode: bankCode || null
-        });
+        };
+
+        // 테스트용: createdAt이 제공되면 사용
+        const { createdAt } = body;
+        if (createdAt) {
+          subscriptionData.createdAt = createdAt;
+        }
+
+        const subscription = addSubscription(subscriptionData);
 
         return NextResponse.json(
           { 
@@ -207,7 +215,7 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { name, price, billingCycle, category, nextPaymentDate, description, accountId, accountNumber, bankCode } = body;
+    const { name, price, billingCycle, category, nextPaymentDate, description, accountId, accountNumber, bankCode, createdAt } = body;
 
     if (!name || !price) {
       return NextResponse.json(
@@ -217,7 +225,7 @@ export async function POST(request) {
     }
 
     // 현재 로그인한 사용자의 ID로 구독 정보 저장
-    const subscription = addSubscription({
+    const subscriptionData = {
       userId: auth.userId, // 각 회원의 구독은 자신의 userId로 저장
       name,
       price: parseFloat(price),
@@ -229,7 +237,14 @@ export async function POST(request) {
       accountId: accountId || null,
       accountNumber: accountNumber || null,
       bankCode: bankCode || null
-    });
+    };
+
+    // 테스트용: createdAt이 제공되면 사용 (개발 환경에서만)
+    if (createdAt && process.env.NODE_ENV === 'development') {
+      subscriptionData.createdAt = createdAt;
+    }
+
+    const subscription = addSubscription(subscriptionData);
 
     return NextResponse.json(
       { 

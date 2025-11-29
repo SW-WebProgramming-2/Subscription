@@ -13,7 +13,9 @@ export function addSubscription(subscription) {
   const newSubscription = {
     id: `sub-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     ...subscription,
-    createdAt: new Date().toISOString()
+    // createdAt이 제공되지 않으면 현재 시간 사용
+    // createdAt이 제공되면 그대로 사용 (시간대 변환 없이)
+    createdAt: subscription.createdAt || new Date().toISOString()
   };
   subscriptions.push(newSubscription);
   return newSubscription;
