@@ -13,6 +13,7 @@ import {
     Legend,
 } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
+import Link from "next/link";
 
 ChartJS.register(
     CategoryScale,
@@ -23,6 +24,34 @@ ChartJS.register(
     Tooltip,
     Legend
 );
+
+// 현재 로그인 사용자 ID를 가져오는 헬퍼
+function getCurrentUserId() {
+    if (typeof window === 'undefined') return null;
+
+    const token = localStorage.getItem('authToken');
+
+    // 개발 환경에서 토큰이 없으면 임시 사용자 ID 사용
+    if (!token) {
+        if (process.env.NODE_ENV === 'development') {
+            return 'temp_user_1';
+        }
+        return null;
+    }
+
+    try {
+        const decoded = atob(token);
+        const payload = JSON.parse(decoded);
+        return payload.userId || null;
+    } catch (e) {
+        console.error('authToken 디코딩 오류:', e);
+        // 토큰 형식이 이상하면 개발 환경에서는 임시 ID, 그 외에는 null
+        if (process.env.NODE_ENV === 'development') {
+            return 'temp_user_1';
+        }
+        return null;
+    }
+}
 
 export default function RecommedPage() {
     const router = useRouter();
@@ -127,52 +156,18 @@ export default function RecommedPage() {
         return preferences;
     };
 
-    // 구독 서비스 데이터 확인
-    const checkSubscriptionData = async (userId) => {
-        try {
-            const DJANGO_API_BASE_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000/api';
-            const url = `${DJANGO_API_BASE_URL}/subscriptions/${userId}/`;
-            
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (!response.ok) {
-                // 404는 데이터가 없는 것으로 간주
-                if (response.status === 404) {
-                    return { hasData: false, subscriptions: [] };
-                }
-                throw new Error(`구독 서비스 데이터 확인 실패: ${response.status} ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            const subscriptions = data.subscriptions || data || [];
-            
-            return { hasData: subscriptions.length > 0, subscriptions };
-        } catch (err) {
-            console.error('구독 서비스 데이터 확인 오류:', err);
-            // 네트워크 오류 등은 데이터가 있다고 가정하고 API 호출을 시도
-            return { hasData: true, subscriptions: null, error: err.message };
-        }
-    };
-
     const fetchRecommendationData = async () => {
         try {
             setLoading(true);
             setError(null);
             
-            const userId = '1';
-            
-            // 먼저 구독 서비스 데이터가 있는지 확인
-            const subscriptionCheck = await checkSubscriptionData(userId);
-            
-            // 구독 서비스 데이터가 없으면 API를 호출하지 않음
-            if (!subscriptionCheck.hasData) {
+            const userId = getCurrentUserId();
+
+            // 사용자 ID가 없으면 추천을 할 수 없음
+            if (!userId) {
                 setCategories([]);
                 setRecommendations([]);
+                setError('로그인 후 AI 추천을 사용할 수 있습니다.');
                 setLoading(false);
                 return;
             }
@@ -230,7 +225,7 @@ export default function RecommedPage() {
                 alignItems: 'center',
                 justifyContent: 'space-between'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{
                         width: '40px',
                         height: '40px',
@@ -246,11 +241,11 @@ export default function RecommedPage() {
                         S
                     </div>
                     <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937' }}>SubManager</span>
-                </div>
+                </Link>
 
                 <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                    <a href="#" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>구독 조회</a>
-                    <a href="/recommendations" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>AI 추천</a>
+                    <a href="/subscriptions" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>구독 조회</a>
+                    <a href="/recommendations" style={{ color: '#667eea', textDecoration: 'none', fontWeight: '600' }}>AI 추천</a>
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem' }}>
