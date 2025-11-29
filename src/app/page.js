@@ -12,6 +12,8 @@ export default function Home() {
   const [subscriptions, setSubscriptions] = useState([]);
   const [isSubsLoading, setIsSubsLoading] = useState(false);
   const [preferences, setPreferences] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
+  const [showSavingsModal, setShowSavingsModal] = useState(false);
 
   useEffect(() => {
     // 로그인 상태 확인 및 구독 정보 불러오기
@@ -59,6 +61,60 @@ export default function Home() {
     };
 
     fetchSubscriptions();
+    
+    // 추천 서비스 불러오기
+    const fetchRecommendations = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          setRecommendations([]);
+          return;
+        }
+        
+        // 현재 사용자 ID 가져오기
+        let userId = null;
+        try {
+          const decoded = atob(token);
+          const payload = JSON.parse(decoded);
+          userId = payload.userId || null;
+        } catch (e) {
+          console.error('토큰 디코딩 오류:', e);
+          if (process.env.NODE_ENV === 'development') {
+            userId = 'temp_user_1';
+          }
+        }
+        
+        if (!userId) {
+          setRecommendations([]);
+          return;
+        }
+        
+        const response = await fetch('/api/gemini', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: '',
+            userId: userId
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.recommendations) {
+            setRecommendations(data.recommendations || []);
+          }
+        }
+      } catch (error) {
+        console.error('추천 서비스 불러오기 오류:', error);
+        setRecommendations([]);
+      }
+    };
+    
+    if (loggedIn) {
+      fetchRecommendations();
+    }
   }, []);
 
   // 설문 기반 개인 선호도 불러오기 (AI 추천과 동일한 로직 참고)
@@ -210,10 +266,94 @@ export default function Home() {
     }).length;
   }, [subscriptions]);
 
-  // 절약 가능 금액 (간단한 예: 월 구독 총합의 20%를 절약 가능 추정치로 표시)
+  // 절약 가능한 서비스 목록 계산
+  const savingsList = useMemo(() => {
+    if (!subscriptions || subscriptions.length === 0 || !recommendations || recommendations.length === 0) {
+      return [];
+    }
+    
+    const savings = [];
+    
+    // 카테고리 정규화 함수 (다양한 형식의 카테고리명을 통일)
+    const normalizeCategory = (category) => {
+      if (!category) return '기타';
+      const cat = category.trim();
+      const categoryMap = {
+        '스트리밍': '스트리밍',
+        'OTT': '스트리밍',
+        'streaming': '스트리밍',
+        '음악': '음악',
+        'music': '음악',
+        '소프트웨어': '소프트웨어',
+        'software': '소프트웨어',
+        '게임': '게임',
+        'gaming': '게임',
+        'game': '게임',
+        '클라우드': '클라우드',
+        'cloud': '클라우드',
+        '뉴스/잡지': '뉴스/잡지',
+        'news': '뉴스/잡지',
+        '피트니스': '피트니스',
+        'fitness': '피트니스',
+        '교육': '교육',
+        'education': '교육',
+        '기타': '기타',
+        'other': '기타'
+      };
+      return categoryMap[cat] || cat;
+    };
+    
+    // 현재 구독 서비스를 카테고리별로 그룹화
+    const subscriptionsByCategory = {};
+    subscriptions.forEach(sub => {
+      const category = normalizeCategory(sub.category || '기타');
+      if (!subscriptionsByCategory[category]) {
+        subscriptionsByCategory[category] = [];
+      }
+      subscriptionsByCategory[category].push(sub);
+    });
+    
+    // 추천 서비스와 비교하여 절약 가능한 서비스 찾기
+    recommendations.forEach(rec => {
+      const recCategory = normalizeCategory(rec.category || '기타');
+      const recPrice = typeof rec.price === 'number' ? rec.price : (parseFloat(rec.price) || 0);
+      
+      // 같은 카테고리인 현재 구독 서비스 찾기
+      const sameCategorySubs = subscriptionsByCategory[recCategory] || [];
+      
+      sameCategorySubs.forEach(currentSub => {
+        const currentPrice = typeof currentSub.monthlyPrice === 'number' 
+          ? currentSub.monthlyPrice 
+          : (parseFloat(currentSub.monthlyPrice) || 0);
+        
+        // 추천 서비스가 더 저렴하면 절약 가능한 서비스로 추가
+        if (recPrice > 0 && currentPrice > recPrice) {
+          const savingsAmount = currentPrice - recPrice;
+          savings.push({
+            currentService: currentSub.serviceName || currentSub.name,
+            currentPrice: currentPrice,
+            recommendedService: rec.name,
+            recommendedPrice: recPrice,
+            savings: savingsAmount,
+            category: recCategory,
+            description: rec.description || ''
+          });
+        }
+      });
+    });
+    
+    // 절약 금액이 큰 순서대로 정렬
+    return savings.sort((a, b) => b.savings - a.savings);
+  }, [subscriptions, recommendations]);
+
+  // 절약 가능 금액 계산: 현재 구독 서비스와 추천 서비스를 비교
   const possibleSavings = useMemo(() => {
-    return Math.round(currentMonthSpending * 0.2);
-  }, [currentMonthSpending]);
+    if (savingsList.length > 0) {
+      return savingsList.reduce((sum, item) => sum + item.savings, 0);
+    }
+    // 절약 가능한 서비스가 없으면 0
+    return 0;
+  }, [savingsList]);
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('ko-KR', {
@@ -443,18 +583,45 @@ export default function Home() {
                 {isLoggedIn && !isSubsLoading ? `${activeSubscriptionsCount}개` : '0개'}
               </p>
             </div>
-            <div style={{
-              background: 'white',
-              padding: '2rem',
-              borderRadius: '12px',
-              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-              textAlign: 'center',
-              color: '#1f2937'
-            }}>
+            <div 
+              onClick={() => {
+                if (isLoggedIn && !isSubsLoading) {
+                  setShowSavingsModal(true);
+                }
+              }}
+              style={{
+                background: 'white',
+                padding: '2rem',
+                borderRadius: '12px',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                textAlign: 'center',
+                color: '#1f2937',
+                cursor: isLoggedIn && !isSubsLoading ? 'pointer' : 'default',
+                transition: 'all 0.2s',
+                userSelect: 'none'
+              }}
+              onMouseEnter={(e) => {
+                if (isLoggedIn && !isSubsLoading) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 12px rgba(0, 0, 0, 0.15)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (isLoggedIn && !isSubsLoading) {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+                }
+              }}
+            >
               <h3 style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '0.5rem', textTransform: 'uppercase' }}>절약 가능</h3>
               <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
                 {isLoggedIn && !isSubsLoading ? formatCurrency(possibleSavings) : '₩0'}
               </p>
+              {isLoggedIn && !isSubsLoading && (
+                <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.5rem', margin: 0 }}>
+                  클릭하여 자세히 보기
+                </p>
+              )}
             </div>
           </div>
         </section>
@@ -572,6 +739,262 @@ export default function Home() {
           )}
         </section>
       </main>
+
+      {/* 절약 가능 서비스 모달 */}
+      {showSavingsModal && (
+        <div
+          onClick={() => setShowSavingsModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '2rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '2rem',
+              maxWidth: '600px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{
+                fontSize: '1.5rem',
+                fontWeight: 'bold',
+                color: '#1f2937',
+                margin: 0
+              }}>
+                절약 가능한 서비스
+              </h2>
+              <button
+                onClick={() => setShowSavingsModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  color: '#6b7280',
+                  cursor: 'pointer',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '4px',
+                  lineHeight: 1
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6';
+                  e.currentTarget.style.color = '#1f2937';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = '#6b7280';
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {savingsList.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '3rem 1rem',
+                color: '#6b7280'
+              }}>
+                <p style={{ marginBottom: '1rem' }}>절약 가능한 서비스가 없습니다.</p>
+                {process.env.NODE_ENV === 'development' && (
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: '#9ca3af',
+                    marginTop: '1rem',
+                    padding: '1rem',
+                    background: '#f9fafb',
+                    borderRadius: '6px',
+                    textAlign: 'left'
+                  }}>
+                    <p>디버깅 정보:</p>
+                    <p>구독 서비스: {subscriptions.length}개</p>
+                    <p>추천 서비스: {recommendations.length}개</p>
+                    {subscriptions.length > 0 && (
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <p>구독 카테고리:</p>
+                        <ul style={{ margin: '0.25rem 0', paddingLeft: '1.5rem' }}>
+                          {[...new Set(subscriptions.map(s => s.category || '기타'))].map((cat, i) => (
+                            <li key={i}>{cat}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {recommendations.length > 0 && (
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <p>추천 카테고리:</p>
+                        <ul style={{ margin: '0.25rem 0', paddingLeft: '1.5rem' }}>
+                          {[...new Set(recommendations.map(r => r.category || '기타'))].map((cat, i) => (
+                            <li key={i}>{cat}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem'
+              }}>
+                {savingsList.map((item, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      padding: '1.5rem',
+                      background: '#f9fafb'
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      marginBottom: '0.75rem'
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{
+                          fontSize: '1rem',
+                          fontWeight: '600',
+                          color: '#1f2937',
+                          marginBottom: '0.25rem'
+                        }}>
+                          {item.currentService}
+                        </div>
+                        <div style={{
+                          fontSize: '0.875rem',
+                          color: '#6b7280',
+                          marginBottom: '0.5rem'
+                        }}>
+                          {formatCurrency(item.currentPrice)}/월
+                        </div>
+                      </div>
+                      <div style={{
+                        fontSize: '1.5rem',
+                        color: '#9ca3af',
+                        margin: '0 1rem',
+                        alignSelf: 'center'
+                      }}>
+                        →
+                      </div>
+                      <div style={{ flex: 1, textAlign: 'right' }}>
+                        <div style={{
+                          fontSize: '1rem',
+                          fontWeight: '600',
+                          color: '#667eea',
+                          marginBottom: '0.25rem'
+                        }}>
+                          {item.recommendedService}
+                        </div>
+                        <div style={{
+                          fontSize: '0.875rem',
+                          color: '#6b7280',
+                          marginBottom: '0.5rem'
+                        }}>
+                          {formatCurrency(item.recommendedPrice)}/월
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {item.description && (
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: '#6b7280',
+                        marginBottom: '0.75rem',
+                        padding: '0.75rem',
+                        background: 'white',
+                        borderRadius: '6px'
+                      }}>
+                        {item.description}
+                      </div>
+                    )}
+                    
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingTop: '0.75rem',
+                      borderTop: '1px solid #e5e7eb'
+                    }}>
+                      <span style={{
+                        fontSize: '0.875rem',
+                        color: '#6b7280'
+                      }}>
+                        {item.category}
+                      </span>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <span style={{
+                          fontSize: '0.875rem',
+                          color: '#6b7280'
+                        }}>
+                          절약 가능:
+                        </span>
+                        <span style={{
+                          fontSize: '1.25rem',
+                          fontWeight: 'bold',
+                          color: '#10b981'
+                        }}>
+                          {formatCurrency(item.savings)}/월
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <div style={{
+                  marginTop: '1rem',
+                  padding: '1rem',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: '8px',
+                  color: 'white',
+                  textAlign: 'center'
+                }}>
+                  <div style={{
+                    fontSize: '0.875rem',
+                    opacity: 0.9,
+                    marginBottom: '0.5rem'
+                  }}>
+                    총 절약 가능 금액
+                  </div>
+                  <div style={{
+                    fontSize: '2rem',
+                    fontWeight: 'bold'
+                  }}>
+                    {formatCurrency(possibleSavings)}/월
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 푸터 */}
       <footer style={{
