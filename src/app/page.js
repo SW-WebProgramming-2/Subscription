@@ -44,6 +44,7 @@ export default function Home() {
             monthlyPrice: sub.price || sub.monthlyPrice,
             paymentDay: paymentDay || sub.paymentDay,
             originalNextPayment: nextPaymentDate || sub.originalNextPayment,
+            billingCycle: sub.billingCycle || 'monthly', // 결제 주기 추가
             category: sub.category || '기타',
           };
         });
@@ -123,14 +124,80 @@ export default function Home() {
     return result;
   };
 
-  // 이번 달 지출(월 구독 총합) 계산
-  const currentMonthSpending = useMemo(() => {
-    if (!subscriptions || subscriptions.length === 0) return 0;
-    return subscriptions.reduce(
-      (sum, sub) => sum + (sub.monthlyPrice || 0),
-      0
-    );
+  // 구독 조회 페이지와 동일한 로직: 현재 월에 맞춰 결제일 계산 (billingCycle 고려)
+  const getPaymentDateForView = (paymentDay, viewDate, billingCycle, originalNextPayment) => {
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    
+    // 연간 결제 주기인 경우, 원본 결제일의 월과 일을 기준으로 계산
+    if (billingCycle === 'yearly' && originalNextPayment) {
+      const originalDate = new Date(originalNextPayment);
+      const originalMonth = originalDate.getMonth();
+      const originalDay = originalDate.getDate();
+      
+      // 현재 보고 있는 연도에서 원본 결제일의 월/일을 사용
+      // 해당 월의 말일 확인
+      const lastDayOfMonth = new Date(year, originalMonth + 1, 0).getDate();
+      const actualDay = Math.min(originalDay, lastDayOfMonth);
+      
+      return new Date(year, originalMonth, actualDay);
+    }
+    
+    // 월간 결제 주기인 경우 기존 로직 사용
+    // 해당 월의 말일 확인 (예: 2월 30일은 없으므로 2월 28일/29일로 처리해야 함)
+    const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+    const actualDay = Math.min(paymentDay, lastDayOfMonth);
+
+    return new Date(year, month, actualDay);
+  };
+
+  // 이번 달에 결제 예정인 구독 필터링 (구독 조회 페이지와 동일한 로직)
+  const currentMonthSubscriptions = useMemo(() => {
+    if (!subscriptions || subscriptions.length === 0) return [];
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const currentDate = new Date(currentYear, currentMonth, 1);
+    
+    // 1. 현재 달 기준으로 모든 구독의 결제일 계산
+    const currentMonthSubs = subscriptions.map(sub => {
+      // 데이터에 paymentDay가 없으면 원본 날짜에서 추출
+      const day = sub.paymentDay || (sub.originalNextPayment ? new Date(sub.originalNextPayment).getDate() : null);
+      if (!day) return null;
+      
+      const billingCycle = sub.billingCycle || 'monthly';
+      const paymentDate = getPaymentDateForView(day, currentDate, billingCycle, sub.originalNextPayment);
+
+      return {
+        ...sub,
+        calculatedPaymentDate: paymentDate
+      };
+    }).filter(sub => sub !== null);
+
+    // 2. 현재 보고 있는 달에 결제일이 있는 구독만 반환
+    return currentMonthSubs
+      .filter(sub => {
+        const paymentYear = sub.calculatedPaymentDate.getFullYear();
+        const paymentMonth = sub.calculatedPaymentDate.getMonth();
+        
+        // 연간 결제 주기인 경우, 원본 결제일의 월이 현재 보고 있는 월과 일치하는지 확인
+        if (sub.billingCycle === 'yearly' && sub.originalNextPayment) {
+          const originalDate = new Date(sub.originalNextPayment);
+          const originalMonth = originalDate.getMonth();
+          // 원본 결제일의 월이 현재 월과 일치하면 포함
+          return originalMonth === currentMonth;
+        }
+        
+        // 월간 결제 주기인 경우, 계산된 결제일이 현재 월과 일치하는지 확인
+        return paymentYear === currentYear && paymentMonth === currentMonth;
+      });
   }, [subscriptions]);
+
+  // 이번 달 지출(구독 조회 페이지의 "이번 달 총 합계"와 동일한 로직)
+  const currentMonthSpending = useMemo(() => {
+    return currentMonthSubscriptions.reduce((sum, sub) => sum + (sub.monthlyPrice || 0), 0);
+  }, [currentMonthSubscriptions]);
 
   // 활성 구독 개수 (현재 기준으로 nextPayment가 아직 지나지 않은 것만 카운트)
   const activeSubscriptionsCount = useMemo(() => {
@@ -486,8 +553,8 @@ export default function Home() {
         {/* 분석 섹션 */}
         <section style={{ marginBottom: '3rem' }}>
           <h2 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1f2937', marginBottom: '1.5rem' }}>지출 분석</h2>
-          {isLoggedIn && subscriptions.length > 0 ? (
-            <Chart data={subscriptions} preferences={preferences} />
+          {isLoggedIn && currentMonthSubscriptions.length > 0 ? (
+            <Chart data={currentMonthSubscriptions} preferences={preferences} />
           ) : (
             <div style={{
               background: 'white',

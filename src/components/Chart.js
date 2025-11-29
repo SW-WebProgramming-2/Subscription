@@ -66,7 +66,7 @@ export default function Chart({ data = [], preferences = null }) {
     return colorMap[normalizedCategory] || { bg: 'rgba(102, 126, 234, 0.8)', border: 'rgba(102, 126, 234, 1)' };
   };
 
-  // 카테고리별 데이터 처리
+  // 카테고리별 데이터 처리 (이미 필터링된 이번 달 구독 데이터 사용)
   const getCategoryData = () => {
     const categoryMap = {};
 
@@ -80,6 +80,7 @@ export default function Chart({ data = [], preferences = null }) {
       '기타': '기타',
     };
 
+    // data는 이미 메인 페이지에서 이번 달에 결제 예정인 구독만 필터링되어 전달됨
     data.forEach(subscription => {
       const category = subscription.category || '기타';
       if (!categoryMap[category]) {

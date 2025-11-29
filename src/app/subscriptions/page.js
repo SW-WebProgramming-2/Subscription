@@ -29,8 +29,8 @@ export default function SubscriptionsPage() {
         
         // 백엔드 데이터 형식을 프론트엔드 형식으로 변환
         const transformedSubscriptions = subscriptionsData.map(sub => {
-          // 백엔드: name, price, next_payment_date
-          // 프론트엔드: serviceName, monthlyPrice, paymentDay, originalNextPayment
+          // 백엔드: name, price, next_payment_date, billingCycle
+          // 프론트엔드: serviceName, monthlyPrice, paymentDay, originalNextPayment, billingCycle
           const nextPaymentDate = sub.next_payment_date || sub.nextPaymentDate;
           const paymentDay = nextPaymentDate ? new Date(nextPaymentDate).getDate() : null;
           
@@ -40,6 +40,7 @@ export default function SubscriptionsPage() {
             monthlyPrice: sub.price || sub.monthlyPrice,
             paymentDay: paymentDay || sub.paymentDay,
             originalNextPayment: nextPaymentDate || sub.originalNextPayment,
+            billingCycle: sub.billingCycle || 'monthly', // 결제 주기 추가
             category: sub.category || '기타',
             userId: sub.userId || null, // admin 조회 시 사용자 ID
             username: sub.username || null, // 사용자 이름
@@ -71,10 +72,26 @@ export default function SubscriptionsPage() {
     fetchSubscriptions();
   }, []); // 컴포넌트 마운트 시 한 번만 실행
 
-  // [유틸리티] 현재 보고 있는 월에 맞춰 결제일 계산
-  const getPaymentDateForView = (paymentDay, viewDate) => {
+  // [유틸리티] 현재 보고 있는 월에 맞춰 결제일 계산 (billingCycle 고려)
+  const getPaymentDateForView = (paymentDay, viewDate, billingCycle, originalNextPayment) => {
     const year = viewDate.getFullYear();
     const month = viewDate.getMonth();
+    
+    // 연간 결제 주기인 경우, 원본 결제일의 월과 일을 기준으로 계산
+    if (billingCycle === 'yearly' && originalNextPayment) {
+      const originalDate = new Date(originalNextPayment);
+      const originalMonth = originalDate.getMonth();
+      const originalDay = originalDate.getDate();
+      
+      // 현재 보고 있는 연도에서 원본 결제일의 월/일을 사용
+      // 해당 월의 말일 확인
+      const lastDayOfMonth = new Date(year, originalMonth + 1, 0).getDate();
+      const actualDay = Math.min(originalDay, lastDayOfMonth);
+      
+      return new Date(year, originalMonth, actualDay);
+    }
+    
+    // 월간 결제 주기인 경우 기존 로직 사용
     // 해당 월의 말일 확인 (예: 2월 30일은 없으므로 2월 28일/29일로 처리해야 함)
     const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
     const actualDay = Math.min(paymentDay, lastDayOfMonth);
@@ -88,7 +105,8 @@ export default function SubscriptionsPage() {
     const currentMonthSubs = subscriptions.map(sub => {
       // 데이터에 paymentDay가 없으면 원본 날짜에서 추출
       const day = sub.paymentDay || new Date(sub.originalNextPayment).getDate();
-      const paymentDate = getPaymentDateForView(day, currentDate);
+      const billingCycle = sub.billingCycle || 'monthly';
+      const paymentDate = getPaymentDateForView(day, currentDate, billingCycle, sub.originalNextPayment);
 
       return {
         ...sub,
@@ -98,8 +116,26 @@ export default function SubscriptionsPage() {
 
     // 2. 날짜 선택 여부에 따라 필터링
     if (selectedDate === null) {
-      // 월 보기: 이번 달 전체 리스트 반환
-      return currentMonthSubs.sort((a, b) => a.calculatedPaymentDate - b.calculatedPaymentDate);
+      // 월 보기: 현재 보고 있는 달에 결제일이 있는 구독만 반환
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth();
+      
+      return currentMonthSubs
+        .filter(sub => {
+          const paymentYear = sub.calculatedPaymentDate.getFullYear();
+          const paymentMonth = sub.calculatedPaymentDate.getMonth();
+          
+          // 연간 결제 주기인 경우, 원본 결제일의 월과 일이 현재 보고 있는 월과 일치하는지 확인
+          if (sub.billingCycle === 'yearly' && sub.originalNextPayment) {
+            const originalDate = new Date(sub.originalNextPayment);
+            return paymentYear === currentYear && paymentMonth === currentMonth && 
+                   paymentMonth === originalDate.getMonth();
+          }
+          
+          // 월간 결제 주기인 경우 기존 로직
+          return paymentYear === currentYear && paymentMonth === currentMonth;
+        })
+        .sort((a, b) => a.calculatedPaymentDate - b.calculatedPaymentDate);
     } else {
       // 일 보기: 선택한 날짜와 정확히 일치하는 구독만 반환
       return currentMonthSubs.filter(sub => {
@@ -200,6 +236,18 @@ export default function SubscriptionsPage() {
     const year = date.getFullYear();
 
     return subscriptions.some(sub => {
+      const billingCycle = sub.billingCycle || 'monthly';
+      
+      // 연간 결제 주기인 경우
+      if (billingCycle === 'yearly' && sub.originalNextPayment) {
+        const originalDate = new Date(sub.originalNextPayment);
+        const originalMonth = originalDate.getMonth();
+        const originalDay = originalDate.getDate();
+        // 원본 결제일의 월과 일이 현재 날짜와 일치하는지 확인
+        return originalDay === day && originalMonth === month && year === currentDate.getFullYear();
+      }
+      
+      // 월간 결제 주기인 경우
       const pDay = sub.paymentDay || new Date(sub.originalNextPayment).getDate();
       // 현재 보고 있는 달의 해당 날짜와 결제일이 일치하는지 확인
       return pDay === day && month === currentDate.getMonth() && year === currentDate.getFullYear();
