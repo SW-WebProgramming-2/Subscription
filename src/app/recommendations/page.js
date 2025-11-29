@@ -102,13 +102,29 @@ export default function RecommedPage() {
         }
         */
 
-        // 임시로 로컬 스토리지에서 가져오기
+        // 임시로 로컬 스토리지에서 가져오기 (사용자별로 구분)
         try {
-            const savedData = localStorage.getItem('surveyAnswers');
+            // 현재 로그인한 사용자 ID 가져오기
+            const userId = getCurrentUserId();
+            
+            if (!userId) {
+                setPreferenceData(null);
+                return;
+            }
+            
+            // 사용자별 설문 데이터 가져오기
+            const surveyKey = `surveyAnswers_${userId}`;
+            const savedData = localStorage.getItem(surveyKey);
+            
             if (savedData) {
                 const surveyData = JSON.parse(savedData);
-                const preferences = calculatePreferences(surveyData.answers);
-                setPreferenceData(preferences);
+                // 저장된 사용자 ID와 현재 사용자 ID가 일치하는지 확인
+                if (surveyData.userId === userId && surveyData.answers) {
+                    const preferences = calculatePreferences(surveyData.answers);
+                    setPreferenceData(preferences);
+                } else {
+                    setPreferenceData(null);
+                }
             } else {
                 // 설문 데이터가 없으면 null로 설정
                 setPreferenceData(null);
@@ -121,6 +137,11 @@ export default function RecommedPage() {
 
     // 설문 답변을 기반으로 선호도 계산
     const calculatePreferences = (answers) => {
+        // answers가 없거나 빈 객체면 null 반환
+        if (!answers || Object.keys(answers).length === 0) {
+            return null;
+        }
+
         const categoryMapping = {
             '스트리밍': 'streaming_preference',
             '음악': 'music_preference',
@@ -143,10 +164,12 @@ export default function RecommedPage() {
 
         const preferences = {};
         const categories = Object.keys(categoryMapping);
+        let hasAnyAnswer = false;
 
         categories.forEach(category => {
             const questionId = categoryMapping[category];
             if (answers[questionId]) {
+                hasAnyAnswer = true;
                 const answer = answers[questionId];
                 if (preferenceScores[answer] !== undefined) {
                     preferences[category] = preferenceScores[answer];
@@ -156,10 +179,13 @@ export default function RecommedPage() {
                 } else {
                     preferences[category] = 3; // 기본값
                 }
-            } else {
-                preferences[category] = 3; // 기본값
             }
         });
+
+        // 하나도 답변이 없으면 null 반환
+        if (!hasAnyAnswer) {
+            return null;
+        }
 
         return preferences;
     };

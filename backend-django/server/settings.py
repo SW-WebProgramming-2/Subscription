@@ -61,10 +61,13 @@ TEMPLATES = [
 WSGI_APPLICATION = 'server.wsgi.application'
 
 # Database
+# 루트 디렉토리에 db.sqlite3 생성되도록 설정
+# BASE_DIR은 backend-django이므로, 상위 디렉토리(루트)를 가리키도록 수정
+ROOT_PROJECT_DIR = BASE_DIR.parent
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': str(ROOT_PROJECT_DIR / 'db.sqlite3'),
     }
 }
 

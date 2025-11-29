@@ -50,7 +50,7 @@ python manage.py migrate
 python manage.py runserver 8000
 ```
 
-서버가 `http://localhost:8000`에서 실행됩니다.
+서버가 `http://localhost:3000`에서 실행됩니다.
 
 ## Docker로 실행
 
