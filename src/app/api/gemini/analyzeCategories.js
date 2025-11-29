@@ -36,6 +36,19 @@ export function analyzeCategories(subscriptions) {
   const categoryPrices = {};
   let totalPrice = 0;
 
+  // 프론트에서 저장하는 영문 카테고리 코드 → 한글 카테고리 매핑
+  const categoryCodeMap = {
+    streaming: '스트리밍',
+    music: '음악',
+    software: '소프트웨어',
+    gaming: '게임',
+    cloud: '클라우드',
+    news: '뉴스/잡지',
+    fitness: '피트니스',
+    education: '교육',
+    other: '기타',
+  };
+
   // 초기화
   validCategories.forEach(category => {
     categoryCounts[category] = 0;
@@ -44,11 +57,25 @@ export function analyzeCategories(subscriptions) {
 
   // 구독 서비스 분석
   subscriptions.forEach(subscription => {
-    const category = subscription.category || '기타';
+    const rawCategory = subscription.category;
     const price = subscription.price || 0;
 
-    // 유효한 카테고리인지 확인
-    const normalizedCategory = validCategories.includes(category) ? category : '기타';
+    // 1) 사용자가 카테고리를 선택하지 않으면 기타
+    if (!rawCategory || String(rawCategory).trim() === '') {
+      categoryCounts['기타'] += 1;
+      categoryPrices['기타'] += price;
+      totalPrice += price;
+      return;
+    }
+
+    // 2) 영문 코드 → 한글 카테고리로 매핑
+    const lower = String(rawCategory).toLowerCase();
+    let normalizedCategory = categoryCodeMap[lower] || rawCategory;
+
+    // 3) 여전히 유효 목록에 없으면 기타로 처리
+    if (!validCategories.includes(normalizedCategory)) {
+      normalizedCategory = '기타';
+    }
 
     categoryCounts[normalizedCategory] = (categoryCounts[normalizedCategory] || 0) + 1;
     categoryPrices[normalizedCategory] = (categoryPrices[normalizedCategory] || 0) + price;

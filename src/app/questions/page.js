@@ -1,6 +1,34 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from "next/link";
+
+// 현재 로그인 사용자 ID를 가져오는 헬퍼
+function getCurrentUserId() {
+    if (typeof window === 'undefined') return null;
+
+    const token = localStorage.getItem('authToken');
+
+    // 개발 환경에서 토큰이 없으면 임시 사용자 ID 사용
+    if (!token) {
+        if (process.env.NODE_ENV === 'development') {
+            return 'temp_user_1';
+        }
+        return null;
+    }
+
+    try {
+        const decoded = atob(token);
+        const payload = JSON.parse(decoded);
+        return payload.userId || null;
+    } catch (e) {
+        console.error('authToken 디코딩 오류:', e);
+        if (process.env.NODE_ENV === 'development') {
+            return 'temp_user_1';
+        }
+        return null;
+    }
+}
 
 export default function QnAPage() {
     const [question, setQuestion] = useState('');
@@ -25,6 +53,13 @@ export default function QnAPage() {
         if (!question.trim() || loading) return;
 
         const userQuestion = question.trim();
+        const userId = getCurrentUserId();
+
+        // 사용자 ID가 없으면 QnA를 진행할 수 없음
+        if (!userId) {
+            setError('로그인 후 AI QnA 기능을 사용할 수 있습니다.');
+            return;
+        }
         setQuestion('');
         setLoading(true);
         setError(null);
@@ -53,7 +88,7 @@ export default function QnAPage() {
                 },
                 body: JSON.stringify({
                     question: userQuestion,
-                    userId: '1',
+                    userId: userId,
                     conversationHistory: conversationHistory
                 })
             });
@@ -134,7 +169,7 @@ export default function QnAPage() {
                 alignItems: 'center',
                 justifyContent: 'space-between'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{
                         width: '40px',
                         height: '40px',
@@ -150,10 +185,10 @@ export default function QnAPage() {
                         S
                     </div>
                     <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937' }}>SubManager</span>
-                </div>
+                </Link>
 
                 <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                    <a href="#" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>구독 조회</a>
+                    <a href="/subscriptions" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>구독 조회</a>
                     <a href="/recommendations" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>AI 추천</a>
                 </div>
 

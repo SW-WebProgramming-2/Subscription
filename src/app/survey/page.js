@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { RECOMMENDATION_DATABASE } from '../api/gemini/recommend.js';
+import Link from "next/link";
 
 export default function survey() {
     const [answers, setAnswers] = useState({});
@@ -149,7 +150,7 @@ export default function survey() {
                 alignItems: 'center',
                 justifyContent: 'space-between'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{
                         width: '40px',
                         height: '40px',
@@ -165,10 +166,10 @@ export default function survey() {
                         S
                     </div>
                     <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1f2937' }}>SubManager</span>
-                </div>
+                </Link>
 
                 <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                    <a href="#" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>구독 조회</a>
+                    <a href="/subscriptions" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>구독 조회</a>
                     <a href="/recommendations" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>AI 추천</a>
                 </div>
 

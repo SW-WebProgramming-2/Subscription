@@ -1,13 +1,18 @@
 /**
- * Django 백엔드에서 구독 서비스 데이터를 가져오는 함수
- * 현재는 더미 데이터를 반환하며, 실제 Django API 연동 시 URL만 변경하면 됩니다.
+ * (임시 구현) Next.js 내부 구독 저장소에서 구독 서비스 데이터를 가져오는 함수
+ * 기존에는 Django 백엔드를 호출하도록 설계되어 있었지만,
+ * 현재 구독 추가 기능은 Next.js 인메모리 저장소(`src/app/api/subscriptions/subscriptions.js`)를 사용하므로
+ * 여기서 직접 그 데이터를 조회하도록 변경했습니다.
+ *
+ * 나중에 Django에 실제 구독 데이터가 쌓이면,
+ * 이 파일만 Django 호출 방식으로 다시 수정하면 됩니다.
  */
 
-const DJANGO_API_BASE_URL = process.env.DJANGO_API_URL || 'http://localhost:8000/api';
+import { getSubscriptionsByUserId } from '../subscriptions/subscriptions';
 
 /**
- * Django API에서 사용자의 구독 서비스 목록을 가져옵니다.
- * 
+ * 사용자의 구독 서비스 목록을 가져옵니다.
+ *
  * @param {string} userId - 사용자 ID
  * @returns {Promise<Array>} 구독 서비스 목록
  */
@@ -16,52 +21,14 @@ export async function fetchUserSubscriptions(userId) {
     throw new Error('사용자 ID가 필요합니다.');
   }
 
-  // 실제 Django API 엔드포인트 URL
-  const url = `${DJANGO_API_BASE_URL}/subscriptions/${userId}/`;
-
   try {
-    // 실제 Django API 호출 (현재는 주석 처리)
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        // 인증 토큰이 필요한 경우
-        // 'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Django API 호출 실패: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.subscriptions || data || [];
-
-
+    const subscriptions = getSubscriptionsByUserId(userId);
+    return subscriptions || [];
   } catch (error) {
-    console.error('Django API 호출 오류:', error);
-    
-    console.warn('Django API 호출 실패');
+    console.error('구독 서비스 데이터 조회 오류:', error);
+    // 오류 발생 시에도 상위 로직이 안전하게 동작하도록 빈 배열 반환
+    return [];
   }
 }
 
-/**
- * Django API 연결 상태를 확인합니다.
- * 
- * @returns {Promise<boolean>} 연결 가능 여부
- */
-export async function checkDjangoConnection() {
-  try {
-    const response = await fetch(`${DJANGO_API_BASE_URL}/health/`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    return response.ok;
-  } catch (error) {
-    return false;
-  }
-}
 
