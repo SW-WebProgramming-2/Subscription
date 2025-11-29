@@ -1,25 +1,172 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { subscriptionAPI } from '@/lib/api';
+import Chart from '@/components/Chart';
 
 export default function Home() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [isSubsLoading, setIsSubsLoading] = useState(false);
+  const [preferences, setPreferences] = useState(null);
 
   useEffect(() => {
-    // 로그인 상태 확인
+    // 로그인 상태 확인 및 구독 정보 불러오기
     const token = localStorage.getItem('authToken');
-    setIsLoggedIn(!!token);
+    const loggedIn = !!token;
+    setIsLoggedIn(loggedIn);
     setIsLoading(false);
+
+    if (!loggedIn) {
+      setSubscriptions([]);
+      return;
+    }
+
+    const fetchSubscriptions = async () => {
+      try {
+        setIsSubsLoading(true);
+        const response = await subscriptionAPI.getSubscriptions();
+        const subscriptionsData = response.subscriptions || response || [];
+
+        // 구독 조회 페이지에서 사용하는 형식과 유사하게 변환
+        const transformed = subscriptionsData.map((sub) => {
+          const nextPaymentDate = sub.next_payment_date || sub.nextPaymentDate;
+          const paymentDay = nextPaymentDate
+            ? new Date(nextPaymentDate).getDate()
+            : null;
+
+          return {
+            id: sub.id,
+            serviceName: sub.name || sub.serviceName,
+            monthlyPrice: sub.price || sub.monthlyPrice,
+            paymentDay: paymentDay || sub.paymentDay,
+            originalNextPayment: nextPaymentDate || sub.originalNextPayment,
+            category: sub.category || '기타',
+          };
+        });
+
+        setSubscriptions(transformed);
+      } catch (error) {
+        console.error('메인 페이지 구독 불러오기 오류:', error);
+        setSubscriptions([]);
+      } finally {
+        setIsSubsLoading(false);
+      }
+    };
+
+    fetchSubscriptions();
   }, []);
+
+  // 설문 기반 개인 선호도 불러오기 (AI 추천과 동일한 로직 참고)
+  useEffect(() => {
+    try {
+      const savedData = localStorage.getItem('surveyAnswers');
+      if (!savedData) {
+        setPreferences(null);
+        return;
+      }
+
+      const surveyData = JSON.parse(savedData);
+      const prefs = calculatePreferencesFromSurvey(surveyData.answers || {});
+      setPreferences(prefs);
+    } catch (error) {
+      console.error('메인 페이지 설문 선호도 로딩 오류:', error);
+      setPreferences(null);
+    }
+  }, []);
+
+  // 설문 답변을 기반으로 카테고리별 선호도(1~5) 계산
+  const calculatePreferencesFromSurvey = (answers) => {
+    const categoryMapping = {
+      '스트리밍': 'streaming_preference',
+      '음악': 'music_preference',
+      '소프트웨어': 'software_preference',
+      '게임': 'game_preference',
+      '클라우드': 'cloud_preference',
+      '뉴스/잡지': 'news_preference',
+      '피트니스': 'fitness_preference',
+      '교육': 'education_preference',
+      '기타': 'preferred_category',
+    };
+
+    const preferenceScores = {
+      '매우 높음': 5,
+      '높음': 4,
+      '보통': 3,
+      '낮음': 2,
+      '매우 낮음': 1,
+    };
+
+    const result = {};
+    const categories = Object.keys(categoryMapping);
+
+    categories.forEach((category) => {
+      const questionId = categoryMapping[category];
+      if (answers[questionId]) {
+        const answer = answers[questionId];
+        if (preferenceScores[answer] !== undefined) {
+          result[category] = preferenceScores[answer];
+        } else if (answer === category) {
+          // preferred_category 질문의 경우
+          result[category] = 5;
+        } else {
+          result[category] = 3;
+        }
+      } else {
+        result[category] = 3;
+      }
+    });
+
+    return result;
+  };
+
+  // 이번 달 지출(월 구독 총합) 계산
+  const currentMonthSpending = useMemo(() => {
+    if (!subscriptions || subscriptions.length === 0) return 0;
+    return subscriptions.reduce(
+      (sum, sub) => sum + (sub.monthlyPrice || 0),
+      0
+    );
+  }, [subscriptions]);
+
+  // 활성 구독 개수 (현재 기준으로 nextPayment가 아직 지나지 않은 것만 카운트)
+  const activeSubscriptionsCount = useMemo(() => {
+    if (!subscriptions || subscriptions.length === 0) return 0;
+    const today = new Date();
+    return subscriptions.filter((sub) => {
+      if (!sub.originalNextPayment) return true; // 날짜 정보 없으면 일단 활성으로 간주
+      const next = new Date(sub.originalNextPayment);
+      return next >= new Date(today.getFullYear(), today.getMonth(), 1);
+    }).length;
+  }, [subscriptions]);
+
+  // 절약 가능 금액 (간단한 예: 월 구독 총합의 20%를 절약 가능 추정치로 표시)
+  const possibleSavings = useMemo(() => {
+    return Math.round(currentMonthSpending * 0.2);
+  }, [currentMonthSpending]);
+
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat('ko-KR', {
+      style: 'currency',
+      currency: 'KRW',
+    }).format(amount);
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     setIsLoggedIn(false);
     router.push('/');
+  };
+
+  const handleAddSubscription = (e) => {
+    if (!isLoggedIn) {
+      e.preventDefault();
+      alert('구독을 추가하려면 로그인이 필요합니다.');
+      router.push('/login');
+    }
   };
 
   return (
@@ -162,18 +309,22 @@ export default function Home() {
               justifyContent: 'center',
               flexWrap: 'wrap'
             }}>
-              <a href="/add/openbanking" style={{
-                background: '#ff6b6b',
-                color: 'white',
-                border: 'none',
-                padding: '1rem 2rem',
-                borderRadius: '50px',
-                fontSize: '1.1rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                textDecoration: 'none',
-                display: 'inline-block'
-              }}>
+              <a 
+                href={isLoggedIn ? "/add/openbanking" : "#"}
+                onClick={handleAddSubscription}
+                style={{
+                  background: '#ff6b6b',
+                  color: 'white',
+                  border: 'none',
+                  padding: '1rem 2rem',
+                  borderRadius: '50px',
+                  fontSize: '1.1rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block'
+                }}
+              >
                 구독 추가하기
               </a>
               <a href="/recommendations" style={{
@@ -208,7 +359,9 @@ export default function Home() {
               color: '#1f2937'
             }}>
               <h3 style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '0.5rem', textTransform: 'uppercase' }}>이번 달 지출</h3>
-              <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>₩0</p>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
+                {isLoggedIn && !isSubsLoading ? formatCurrency(currentMonthSpending) : '₩0'}
+              </p>
             </div>
             <div style={{
               background: 'white',
@@ -219,7 +372,9 @@ export default function Home() {
               color: '#1f2937'
             }}>
               <h3 style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '0.5rem', textTransform: 'uppercase' }}>활성 구독</h3>
-              <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>0개</p>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
+                {isLoggedIn && !isSubsLoading ? `${activeSubscriptionsCount}개` : '0개'}
+              </p>
             </div>
             <div style={{
               background: 'white',
@@ -230,7 +385,9 @@ export default function Home() {
               color: '#1f2937'
             }}>
               <h3 style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '0.5rem', textTransform: 'uppercase' }}>절약 가능</h3>
-              <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>₩0</p>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
+                {isLoggedIn && !isSubsLoading ? formatCurrency(possibleSavings) : '₩0'}
+              </p>
             </div>
           </div>
         </section>
@@ -239,17 +396,21 @@ export default function Home() {
         <section style={{ marginBottom: '3rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h2 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>내 구독 서비스</h2>
-            <a href="/add/openbanking" style={{
-              background: '#667eea',
-              color: 'white',
-              border: 'none',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '8px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              textDecoration: 'none',
-              display: 'inline-block'
-            }}>
+            <a 
+              href={isLoggedIn ? "/add/openbanking" : "#"}
+              onClick={handleAddSubscription}
+              style={{
+                background: '#667eea',
+                color: 'white',
+                border: 'none',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '8px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'inline-block'
+              }}
+            >
               + 구독 추가
             </a>
           </div>
@@ -257,32 +418,91 @@ export default function Home() {
           <div style={{
             background: 'white',
             borderRadius: '12px',
-            padding: '3rem',
+            padding: '2rem',
             boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-            color: '#1f2937',
-            textAlign: 'center'
+            color: '#1f2937'
           }}>
-            <p style={{ fontSize: '1.1rem', color: '#6b7280', margin: '0.5rem 0' }}>아직 등록된 구독 서비스가 없습니다.</p>
-            <p style={{ fontSize: '1.1rem', color: '#6b7280' }}>구독 서비스를 추가해보세요!</p>
+            {isSubsLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                구독 정보를 불러오는 중입니다...
+              </div>
+            ) : subscriptions.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                <p style={{ fontSize: '1.1rem', margin: '0.5rem 0' }}>아직 등록된 구독 서비스가 없습니다.</p>
+                <p style={{ fontSize: '1.1rem' }}>구독 서비스를 추가해보세요!</p>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: '1.5rem'
+              }}>
+                {subscriptions.map((sub) => (
+                  <div
+                    key={sub.id}
+                    style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '10px',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                      background: '#f9fafb'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>
+                        {sub.serviceName}
+                      </h3>
+                      <span style={{
+                        fontSize: '0.8rem',
+                        padding: '0.25rem 0.6rem',
+                        borderRadius: '999px',
+                        background: '#eef2ff',
+                        color: '#4f46e5',
+                        fontWeight: 500
+                      }}>
+                        {sub.category}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '1rem', fontWeight: 'bold', color: '#111827' }}>
+                        {formatCurrency(sub.monthlyPrice || 0)}
+                      </div>
+                      {sub.originalNextPayment && (
+                        <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                          다음 결제일:{' '}
+                          {new Date(sub.originalNextPayment).toLocaleDateString('ko-KR')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
         {/* 분석 섹션 */}
         <section style={{ marginBottom: '3rem' }}>
           <h2 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1f2937', marginBottom: '1.5rem' }}>지출 분석</h2>
-          <div style={{
-            background: 'white',
-            borderRadius: '12px',
-            padding: '2rem',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-            minHeight: '400px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#6b7280'
-          }}>
-            <p>차트가 여기에 표시됩니다</p>
-          </div>
+          {isLoggedIn && subscriptions.length > 0 ? (
+            <Chart data={subscriptions} preferences={preferences} />
+          ) : (
+            <div style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '2rem',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+              minHeight: '400px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#6b7280'
+            }}>
+              <p>차트가 여기에 표시됩니다</p>
+            </div>
+          )}
         </section>
       </main>
 
