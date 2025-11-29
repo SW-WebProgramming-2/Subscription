@@ -81,7 +81,7 @@ export default function survey() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         // 모든 질문에 답변했는지 확인
         const allAnswered = questions.every(q => answers[q.id]);
         if (!allAnswered) {
@@ -125,7 +125,7 @@ export default function survey() {
             // 현재 로그인한 사용자 ID 가져오기
             const token = localStorage.getItem('authToken');
             let userId = null;
-            
+
             if (token) {
                 try {
                     const decoded = atob(token);
@@ -135,13 +135,13 @@ export default function survey() {
                     console.error('토큰 디코딩 오류:', e);
                 }
             }
-            
+
             // 사용자 ID가 없으면 저장하지 않음
             if (!userId) {
                 alert('로그인이 필요합니다.');
                 return;
             }
-            
+
             // 사용자별로 설문 데이터 저장
             const surveyKey = `surveyAnswers_${userId}`;
             localStorage.setItem(surveyKey, JSON.stringify({

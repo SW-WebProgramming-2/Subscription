@@ -106,16 +106,16 @@ export default function RecommedPage() {
         try {
             // 현재 로그인한 사용자 ID 가져오기
             const userId = getCurrentUserId();
-            
+
             if (!userId) {
                 setPreferenceData(null);
                 return;
             }
-            
+
             // 사용자별 설문 데이터 가져오기
             const surveyKey = `surveyAnswers_${userId}`;
             const savedData = localStorage.getItem(surveyKey);
-            
+
             if (savedData) {
                 const surveyData = JSON.parse(savedData);
                 // 저장된 사용자 ID와 현재 사용자 ID가 일치하는지 확인
@@ -194,7 +194,7 @@ export default function RecommedPage() {
         try {
             setLoading(true);
             setError(null);
-            
+
             const userId = getCurrentUserId();
 
             // 사용자 ID가 없으면 추천을 할 수 없음
@@ -205,7 +205,7 @@ export default function RecommedPage() {
                 setLoading(false);
                 return;
             }
-            
+
             // 구독 서비스 데이터가 있으면 API 호출
             const response = await fetch('/api/gemini', {
                 method: 'POST',
@@ -223,7 +223,7 @@ export default function RecommedPage() {
             }
 
             const data = await response.json();
-            
+
             if (data.success) {
                 setCategories(data.categories || []);
                 setRecommendations(data.recommendations || []);
@@ -412,7 +412,7 @@ export default function RecommedPage() {
                             }}>
                                 카테고리 분석
                             </h2>
-                            
+
                             {categories.length > 0 ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                     {categories.map((item, index) => (
@@ -467,7 +467,7 @@ export default function RecommedPage() {
                             }}>
                                 추천 구독 서비스
                             </h2>
-                            
+
                             {recommendations.length > 0 ? (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
                                     {recommendations.map((rec, index) => (
@@ -479,8 +479,8 @@ export default function RecommedPage() {
                                             transition: 'transform 0.2s',
                                             cursor: 'pointer'
                                         }}
-                                        onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                                             onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                             onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                                         >
                                             <div style={{
                                                 fontSize: '1.125rem',
