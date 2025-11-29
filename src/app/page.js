@@ -15,6 +15,9 @@ export default function Home() {
   const [recommendations, setRecommendations] = useState([]);
   const [showSavingsModal, setShowSavingsModal] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editFormData, setEditFormData] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     // 로그인 상태 확인 및 구독 정보 불러오기
@@ -378,6 +381,119 @@ export default function Home() {
     }
   };
 
+  // 수정 모드 시작
+  const handleStartEdit = () => {
+    setIsEditMode(true);
+    setEditFormData({
+      name: selectedSubscription.serviceName,
+      price: selectedSubscription.monthlyPrice,
+      category: selectedSubscription.category,
+      billingCycle: selectedSubscription.billingCycle || 'monthly',
+      nextPaymentDate: selectedSubscription.originalNextPayment ? 
+        new Date(selectedSubscription.originalNextPayment).toISOString().split('T')[0] : '',
+      description: selectedSubscription.description || ''
+    });
+  };
+
+  // 수정 취소
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setEditFormData(null);
+  };
+
+  // 구독 정보 수정 저장
+  const handleSaveEdit = async () => {
+    if (!editFormData.name || !editFormData.price) {
+      alert('서비스명과 가격은 필수입니다.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/subscriptions/${selectedSubscription.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          name: editFormData.name,
+          price: parseFloat(editFormData.price),
+          category: editFormData.category || '기타',
+          billingCycle: editFormData.billingCycle || 'monthly',
+          nextPaymentDate: editFormData.nextPaymentDate || null,
+          description: editFormData.description || ''
+        })
+      });
+
+      const updatedData = await response.json();
+      
+      if (!response.ok) {
+        let errorMessage = `구독 수정에 실패했습니다. (status: ${response.status})`;
+        if (updatedData && updatedData.error) {
+          errorMessage = updatedData.error;
+        }
+        throw new Error(errorMessage);
+      }
+
+      // 수정 성공 시 목록 새로고침
+      try {
+        setIsSubsLoading(true);
+        const refreshResponse = await subscriptionAPI.getSubscriptions();
+        const subscriptionsData = refreshResponse.subscriptions || refreshResponse || [];
+
+        const transformed = subscriptionsData.map((sub) => {
+          const nextPaymentDate = sub.next_payment_date || sub.nextPaymentDate;
+          const paymentDay = nextPaymentDate
+            ? new Date(nextPaymentDate).getDate()
+            : null;
+
+          return {
+            id: sub.id,
+            serviceName: sub.name || sub.serviceName,
+            monthlyPrice: sub.price || sub.monthlyPrice,
+            paymentDay: paymentDay || sub.paymentDay,
+            originalNextPayment: nextPaymentDate || sub.originalNextPayment,
+            billingCycle: sub.billingCycle || 'monthly',
+            category: sub.category || '기타',
+            description: sub.description || '',
+          };
+        });
+
+        setSubscriptions(transformed);
+      } catch (error) {
+        console.error('메인 페이지 구독 불러오기 오류:', error);
+        setSubscriptions([]);
+      } finally {
+        setIsSubsLoading(false);
+      }
+      
+      // 수정된 구독 정보로 업데이트
+      if (updatedData.subscription) {
+        const updatedSub = {
+          ...selectedSubscription,
+          serviceName: updatedData.subscription.name,
+          monthlyPrice: updatedData.subscription.price,
+          category: updatedData.subscription.category,
+          billingCycle: updatedData.subscription.billingCycle,
+          description: updatedData.subscription.description,
+          originalNextPayment: updatedData.subscription.nextPaymentDate || updatedData.subscription.next_payment_date
+        };
+        setSelectedSubscription(updatedSub);
+      }
+      
+      setIsEditMode(false);
+      setEditFormData(null);
+      alert('구독 정보가 수정되었습니다.');
+    } catch (err) {
+      console.error('구독 수정 오류:', err);
+      alert(err.message || '구독 수정 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div style={{ 
       minHeight: '100vh', 
@@ -676,7 +792,11 @@ export default function Home() {
                 {subscriptions.map((sub) => (
                   <div
                     key={sub.id}
-                    onClick={() => setSelectedSubscription(sub)}
+                    onClick={() => {
+                      setSelectedSubscription(sub);
+                      setIsEditMode(false);
+                      setEditFormData(null);
+                    }}
                     style={{
                       border: '1px solid #e5e7eb',
                       borderRadius: '10px',
@@ -1054,10 +1174,14 @@ export default function Home() {
                 color: '#1f2937',
                 margin: 0
               }}>
-                {selectedSubscription.serviceName}
+                {isEditMode ? '구독 정보 수정' : selectedSubscription.serviceName}
               </h2>
               <button
-                onClick={() => setSelectedSubscription(null)}
+                onClick={() => {
+                  setSelectedSubscription(null);
+                  setIsEditMode(false);
+                  setEditFormData(null);
+                }}
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -1081,112 +1205,370 @@ export default function Home() {
               </button>
             </div>
 
-            <div style={{
-              marginBottom: '1rem',
-              padding: '1rem',
-              background: '#f9fafb',
-              borderRadius: '8px'
-            }}>
-              <div style={{
-                fontSize: '0.875rem',
-                color: '#6b7280',
-                marginBottom: '0.5rem'
-              }}>
-                카테고리
-              </div>
-              <div style={{
-                fontSize: '1rem',
-                fontWeight: '600',
-                color: '#1f2937'
-              }}>
-                {selectedSubscription.category}
-              </div>
-            </div>
-
-            <div style={{
-              marginBottom: '1rem',
-              padding: '1rem',
-              background: '#f9fafb',
-              borderRadius: '8px'
-            }}>
-              <div style={{
-                fontSize: '0.875rem',
-                color: '#6b7280',
-                marginBottom: '0.5rem'
-              }}>
-                월 구독료
-              </div>
-              <div style={{
-                fontSize: '1.25rem',
-                fontWeight: 'bold',
-                color: '#667eea'
-              }}>
-                {formatCurrency(selectedSubscription.monthlyPrice || 0)}
-              </div>
-            </div>
-
-            {selectedSubscription.description ? (
-              <div style={{
-                marginBottom: '1rem'
-              }}>
-                <div style={{
-                  fontSize: '0.875rem',
-                  color: '#6b7280',
-                  marginBottom: '0.5rem',
-                  fontWeight: '500'
-                }}>
-                  설명
+            {isEditMode && editFormData ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    서비스명 *
+                  </label>
+                  <input
+                    type="text"
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '1rem'
+                    }}
+                  />
                 </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    가격 (원) *
+                  </label>
+                  <input
+                    type="number"
+                    value={editFormData.price}
+                    onChange={(e) => setEditFormData({...editFormData, price: e.target.value})}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    카테고리
+                  </label>
+                  <select
+                    value={editFormData.category}
+                    onChange={(e) => setEditFormData({...editFormData, category: e.target.value})}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    <option value="스트리밍">스트리밍</option>
+                    <option value="음악">음악</option>
+                    <option value="소프트웨어">소프트웨어</option>
+                    <option value="게임">게임</option>
+                    <option value="클라우드">클라우드</option>
+                    <option value="뉴스/잡지">뉴스/잡지</option>
+                    <option value="피트니스">피트니스</option>
+                    <option value="교육">교육</option>
+                    <option value="기타">기타</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    결제 주기
+                  </label>
+                  <select
+                    value={editFormData.billingCycle}
+                    onChange={(e) => setEditFormData({...editFormData, billingCycle: e.target.value})}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    <option value="monthly">월간</option>
+                    <option value="yearly">연간</option>
+                    <option value="quarterly">분기</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    다음 결제일
+                  </label>
+                  <input
+                    type="date"
+                    value={editFormData.nextPaymentDate}
+                    onChange={(e) => setEditFormData({...editFormData, nextPaymentDate: e.target.value})}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '1rem'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    설명
+                  </label>
+                  <textarea
+                    value={editFormData.description}
+                    onChange={(e) => setEditFormData({...editFormData, description: e.target.value})}
+                    placeholder="구독 서비스에 대한 추가 정보를 입력하세요"
+                    rows="4"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      fontFamily: 'inherit',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+
                 <div style={{
-                  fontSize: '1rem',
-                  color: '#1f2937',
-                  lineHeight: '1.6',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word'
+                  marginTop: '1rem',
+                  paddingTop: '1rem',
+                  borderTop: '1px solid #e5e7eb',
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '0.5rem'
                 }}>
-                  {selectedSubscription.description}
+                  <button
+                    onClick={handleCancelEdit}
+                    disabled={isSaving}
+                    style={{
+                      background: 'transparent',
+                      color: '#6b7280',
+                      border: '1px solid #d1d5db',
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '8px',
+                      fontWeight: '600',
+                      cursor: isSaving ? 'not-allowed' : 'pointer',
+                      fontSize: '1rem',
+                      opacity: isSaving ? 0.5 : 1
+                    }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={isSaving}
+                    style={{
+                      background: '#667eea',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '8px',
+                      fontWeight: '600',
+                      cursor: isSaving ? 'not-allowed' : 'pointer',
+                      fontSize: '1rem',
+                      opacity: isSaving ? 0.5 : 1
+                    }}
+                  >
+                    {isSaving ? '저장 중...' : '저장'}
+                  </button>
                 </div>
               </div>
             ) : (
-              <div style={{
-                padding: '2rem',
-                textAlign: 'center',
-                color: '#9ca3af',
-                fontSize: '0.875rem'
-              }}>
-                설명이 없습니다.
-              </div>
-            )}
+              <>
+                <div style={{
+                  marginBottom: '1rem',
+                  padding: '1rem',
+                  background: '#f9fafb',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    marginBottom: '0.5rem'
+                  }}>
+                    카테고리
+                  </div>
+                  <div style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#1f2937'
+                  }}>
+                    {selectedSubscription.category}
+                  </div>
+                </div>
 
-            <div style={{
-              marginTop: '1.5rem',
-              paddingTop: '1rem',
-              borderTop: '1px solid #e5e7eb',
-              display: 'flex',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={() => setSelectedSubscription(null)}
-                style={{
-                  background: '#667eea',
-                  color: 'white',
-                  border: 'none',
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  fontSize: '1rem'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#5568d3';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#667eea';
-                }}
-              >
-                닫기
-              </button>
-            </div>
+                <div style={{
+                  marginBottom: '1rem',
+                  padding: '1rem',
+                  background: '#f9fafb',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    marginBottom: '0.5rem'
+                  }}>
+                    월 구독료
+                  </div>
+                  <div style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 'bold',
+                    color: '#667eea'
+                  }}>
+                    {formatCurrency(selectedSubscription.monthlyPrice || 0)}
+                  </div>
+                </div>
+
+                <div style={{
+                  marginBottom: '1rem',
+                  padding: '1rem',
+                  background: '#f9fafb',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{
+                    fontSize: '0.875rem',
+                    color: '#6b7280',
+                    marginBottom: '0.5rem'
+                  }}>
+                    결제 주기
+                  </div>
+                  <div style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#1f2937'
+                  }}>
+                    {selectedSubscription.billingCycle === 'yearly' ? '연간' : 
+                     selectedSubscription.billingCycle === 'quarterly' ? '분기' : '월간'}
+                  </div>
+                </div>
+
+                {selectedSubscription.description ? (
+                  <div style={{
+                    marginBottom: '1rem'
+                  }}>
+                    <div style={{
+                      fontSize: '0.875rem',
+                      color: '#6b7280',
+                      marginBottom: '0.5rem',
+                      fontWeight: '500'
+                    }}>
+                      설명
+                    </div>
+                    <div style={{
+                      fontSize: '1rem',
+                      color: '#1f2937',
+                      lineHeight: '1.6',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word'
+                    }}>
+                      {selectedSubscription.description}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '2rem',
+                    textAlign: 'center',
+                    color: '#9ca3af',
+                    fontSize: '0.875rem'
+                  }}>
+                    설명이 없습니다.
+                  </div>
+                )}
+
+                <div style={{
+                  marginTop: '1.5rem',
+                  paddingTop: '1rem',
+                  borderTop: '1px solid #e5e7eb',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem'
+                }}>
+                  <button
+                    onClick={handleStartEdit}
+                    style={{
+                      background: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '8px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      fontSize: '1rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#059669';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#10b981';
+                    }}
+                  >
+                    수정
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedSubscription(null);
+                      setIsEditMode(false);
+                      setEditFormData(null);
+                    }}
+                    style={{
+                      background: '#667eea',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '8px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      fontSize: '1rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#5568d3';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#667eea';
+                    }}
+                  >
+                    닫기
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
