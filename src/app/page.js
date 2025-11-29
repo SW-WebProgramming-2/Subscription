@@ -14,6 +14,7 @@ export default function Home() {
   const [preferences, setPreferences] = useState(null);
   const [recommendations, setRecommendations] = useState([]);
   const [showSavingsModal, setShowSavingsModal] = useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState(null);
 
   useEffect(() => {
     // 로그인 상태 확인 및 구독 정보 불러오기
@@ -48,6 +49,7 @@ export default function Home() {
             originalNextPayment: nextPaymentDate || sub.originalNextPayment,
             billingCycle: sub.billingCycle || 'monthly', // 결제 주기 추가
             category: sub.category || '기타',
+            description: sub.description || '', // 설명 추가
           };
         });
 
@@ -674,6 +676,7 @@ export default function Home() {
                 {subscriptions.map((sub) => (
                   <div
                     key={sub.id}
+                    onClick={() => setSelectedSubscription(sub)}
                     style={{
                       border: '1px solid #e5e7eb',
                       borderRadius: '10px',
@@ -681,7 +684,21 @@ export default function Home() {
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '0.5rem',
-                      background: '#f9fafb'
+                      background: '#f9fafb',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#f3f4f6';
+                      e.currentTarget.style.borderColor = '#667eea';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#f9fafb';
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -992,6 +1009,184 @@ export default function Home() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 구독 설명 모달 */}
+      {selectedSubscription && (
+        <div
+          onClick={() => setSelectedSubscription(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '2rem'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '2rem',
+              maxWidth: '500px',
+              width: '100%',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{
+                fontSize: '1.5rem',
+                fontWeight: 'bold',
+                color: '#1f2937',
+                margin: 0
+              }}>
+                {selectedSubscription.serviceName}
+              </h2>
+              <button
+                onClick={() => setSelectedSubscription(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  color: '#6b7280',
+                  cursor: 'pointer',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '4px',
+                  lineHeight: 1
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6';
+                  e.currentTarget.style.color = '#1f2937';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = '#6b7280';
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{
+              marginBottom: '1rem',
+              padding: '1rem',
+              background: '#f9fafb',
+              borderRadius: '8px'
+            }}>
+              <div style={{
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                marginBottom: '0.5rem'
+              }}>
+                카테고리
+              </div>
+              <div style={{
+                fontSize: '1rem',
+                fontWeight: '600',
+                color: '#1f2937'
+              }}>
+                {selectedSubscription.category}
+              </div>
+            </div>
+
+            <div style={{
+              marginBottom: '1rem',
+              padding: '1rem',
+              background: '#f9fafb',
+              borderRadius: '8px'
+            }}>
+              <div style={{
+                fontSize: '0.875rem',
+                color: '#6b7280',
+                marginBottom: '0.5rem'
+              }}>
+                월 구독료
+              </div>
+              <div style={{
+                fontSize: '1.25rem',
+                fontWeight: 'bold',
+                color: '#667eea'
+              }}>
+                {formatCurrency(selectedSubscription.monthlyPrice || 0)}
+              </div>
+            </div>
+
+            {selectedSubscription.description ? (
+              <div style={{
+                marginBottom: '1rem'
+              }}>
+                <div style={{
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  marginBottom: '0.5rem',
+                  fontWeight: '500'
+                }}>
+                  설명
+                </div>
+                <div style={{
+                  fontSize: '1rem',
+                  color: '#1f2937',
+                  lineHeight: '1.6',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word'
+                }}>
+                  {selectedSubscription.description}
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                padding: '2rem',
+                textAlign: 'center',
+                color: '#9ca3af',
+                fontSize: '0.875rem'
+              }}>
+                설명이 없습니다.
+              </div>
+            )}
+
+            <div style={{
+              marginTop: '1.5rem',
+              paddingTop: '1rem',
+              borderTop: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => setSelectedSubscription(null)}
+                style={{
+                  background: '#667eea',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  fontSize: '1rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#5568d3';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#667eea';
+                }}
+              >
+                닫기
+              </button>
+            </div>
           </div>
         </div>
       )}
