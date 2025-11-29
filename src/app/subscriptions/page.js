@@ -2,17 +2,27 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { subscriptionAPI } from '@/lib/api';
 
 export default function SubscriptionsPage() {
+  const router = useRouter();
   // 구독 데이터 (API에서 불러옴)
   const [subscriptions, setSubscriptions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const [currentDate, setCurrentDate] = useState(new Date()); // 현재 보고 있는 달력의 월
   const [selectedDate, setSelectedDate] = useState(null); // 클릭한 날짜
+
+  // 로그인 상태 확인
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    const loggedIn = !!token;
+    setIsLoggedIn(loggedIn);
+  }, []);
 
   // 구독 목록 불러오기 (구독 추가에서 사용하는 것과 동일한 API)
   useEffect(() => {
@@ -194,6 +204,13 @@ export default function SubscriptionsPage() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    setIsLoggedIn(false);
+    router.push('/');
+  };
+
   const handleDeleteSubscription = async (id) => {
     const confirmed = window.confirm('정말로 이 구독을 삭제하시겠습니까?');
     if (!confirmed) return;
@@ -357,8 +374,66 @@ export default function SubscriptionsPage() {
           </div>
 
           <div style={{ display: 'flex', gap: '1rem' }}>
-            <button style={{ background: 'transparent', color: '#6b7280', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', fontWeight: '500', cursor: 'pointer' }}>로그인</button>
-            <button style={{ background: '#667eea', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', fontWeight: '500', cursor: 'pointer' }}>회원가입</button>
+            {isLoggedIn ? (
+              <>
+                <Link href="/profile" style={{
+                  background: '#667eea',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block'
+                }}>
+                  회원 정보 조회
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    background: 'transparent',
+                    color: '#6b7280',
+                    border: 'none',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '6px',
+                    fontWeight: '500',
+                    cursor: 'pointer'
+                  }}
+                >
+                  로그아웃
+                </button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" style={{
+                  background: 'transparent',
+                  color: '#6b7280',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block'
+                }}>
+                  로그인
+                </Link>
+                <Link href="/signup" style={{
+                  background: '#667eea',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block'
+                }}>
+                  회원가입
+                </Link>
+              </>
+            )}
           </div>
         </nav>
 
