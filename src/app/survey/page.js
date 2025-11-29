@@ -120,9 +120,32 @@ export default function survey() {
         }
         */
 
-        // 임시로 로컬 스토리지에 저장
+        // 임시로 로컬 스토리지에 저장 (사용자별로 구분)
         try {
-            localStorage.setItem('surveyAnswers', JSON.stringify({
+            // 현재 로그인한 사용자 ID 가져오기
+            const token = localStorage.getItem('authToken');
+            let userId = null;
+            
+            if (token) {
+                try {
+                    const decoded = atob(token);
+                    const payload = JSON.parse(decoded);
+                    userId = payload.userId || null;
+                } catch (e) {
+                    console.error('토큰 디코딩 오류:', e);
+                }
+            }
+            
+            // 사용자 ID가 없으면 저장하지 않음
+            if (!userId) {
+                alert('로그인이 필요합니다.');
+                return;
+            }
+            
+            // 사용자별로 설문 데이터 저장
+            const surveyKey = `surveyAnswers_${userId}`;
+            localStorage.setItem(surveyKey, JSON.stringify({
+                userId: userId,
                 answers: answers,
                 timestamp: new Date().toISOString()
             }));
