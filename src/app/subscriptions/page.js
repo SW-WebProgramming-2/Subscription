@@ -158,6 +158,41 @@ export default function SubscriptionsPage() {
     }
   };
 
+  const handleDeleteSubscription = async (id) => {
+    const confirmed = window.confirm('정말로 이 구독을 삭제하시겠습니까?');
+    if (!confirmed) return;
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const res = await fetch(`/api/subscriptions/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+      });
+
+      if (!res.ok) {
+        let errorMessage = `구독 삭제에 실패했습니다. (status: ${res.status})`;
+        try {
+          const data = await res.json();
+          if (data && data.error) {
+            errorMessage = data.error;
+          }
+        } catch (e) {
+          // ignore JSON parse error
+        }
+        throw new Error(errorMessage);
+      }
+
+      // 삭제 성공 시 로컬 상태에서 제거
+      setSubscriptions((prev) => prev.filter((sub) => sub.id !== id));
+    } catch (err) {
+      console.error('구독 삭제 오류:', err);
+      window.alert(err.message || '구독 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
   // [버그 수정] 특정 날짜에 결제일이 있는지 확인하는 함수 (인디케이터용)
   const hasPaymentOnDate = (date) => {
     const day = date.getDate();
@@ -460,8 +495,25 @@ export default function SubscriptionsPage() {
                               )}
                             </p>
                           </div>
-                          <div style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#667eea' }}>
-                            {formatCurrency(sub.monthlyPrice)}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#667eea' }}>
+                              {formatCurrency(sub.monthlyPrice)}
+                            </div>
+                            <button
+                              onClick={() => handleDeleteSubscription(sub.id)}
+                              style={{
+                                padding: '0.4rem 0.75rem',
+                                borderRadius: '6px',
+                                border: '1px solid #ef4444',
+                                backgroundColor: '#fee2e2',
+                                color: '#b91c1c',
+                                fontSize: '0.8rem',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              삭제
+                            </button>
                           </div>
                         </div>
                     ))
