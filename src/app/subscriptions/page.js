@@ -2,17 +2,31 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { subscriptionAPI } from '@/lib/api';
 
 export default function SubscriptionsPage() {
+  const router = useRouter();
   // 구독 데이터 (API에서 불러옴)
   const [subscriptions, setSubscriptions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editFormData, setEditFormData] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [currentDate, setCurrentDate] = useState(new Date()); // 현재 보고 있는 달력의 월
   const [selectedDate, setSelectedDate] = useState(null); // 클릭한 날짜
+
+  // 로그인 상태 확인
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    const loggedIn = !!token;
+    setIsLoggedIn(loggedIn);
+  }, []);
 
   // 구독 목록 불러오기 (구독 추가에서 사용하는 것과 동일한 API)
   useEffect(() => {
@@ -29,8 +43,8 @@ export default function SubscriptionsPage() {
         
         // 백엔드 데이터 형식을 프론트엔드 형식으로 변환
         const transformedSubscriptions = subscriptionsData.map(sub => {
-          // 백엔드: name, price, next_payment_date
-          // 프론트엔드: serviceName, monthlyPrice, paymentDay, originalNextPayment
+          // 백엔드: name, price, next_payment_date, billingCycle
+          // 프론트엔드: serviceName, monthlyPrice, paymentDay, originalNextPayment, billingCycle
           const nextPaymentDate = sub.next_payment_date || sub.nextPaymentDate;
           const paymentDay = nextPaymentDate ? new Date(nextPaymentDate).getDate() : null;
           
@@ -40,7 +54,9 @@ export default function SubscriptionsPage() {
             monthlyPrice: sub.price || sub.monthlyPrice,
             paymentDay: paymentDay || sub.paymentDay,
             originalNextPayment: nextPaymentDate || sub.originalNextPayment,
+            billingCycle: sub.billingCycle || 'monthly', // 결제 주기 추가
             category: sub.category || '기타',
+            description: sub.description || '', // 설명 추가
             userId: sub.userId || null, // admin 조회 시 사용자 ID
             username: sub.username || null, // 사용자 이름
           };
@@ -71,10 +87,26 @@ export default function SubscriptionsPage() {
     fetchSubscriptions();
   }, []); // 컴포넌트 마운트 시 한 번만 실행
 
-  // [유틸리티] 현재 보고 있는 월에 맞춰 결제일 계산
-  const getPaymentDateForView = (paymentDay, viewDate) => {
+  // [유틸리티] 현재 보고 있는 월에 맞춰 결제일 계산 (billingCycle 고려)
+  const getPaymentDateForView = (paymentDay, viewDate, billingCycle, originalNextPayment) => {
     const year = viewDate.getFullYear();
     const month = viewDate.getMonth();
+    
+    // 연간 결제 주기인 경우, 원본 결제일의 월과 일을 기준으로 계산
+    if (billingCycle === 'yearly' && originalNextPayment) {
+      const originalDate = new Date(originalNextPayment);
+      const originalMonth = originalDate.getMonth();
+      const originalDay = originalDate.getDate();
+      
+      // 현재 보고 있는 연도에서 원본 결제일의 월/일을 사용
+      // 해당 월의 말일 확인
+      const lastDayOfMonth = new Date(year, originalMonth + 1, 0).getDate();
+      const actualDay = Math.min(originalDay, lastDayOfMonth);
+      
+      return new Date(year, originalMonth, actualDay);
+    }
+    
+    // 월간 결제 주기인 경우 기존 로직 사용
     // 해당 월의 말일 확인 (예: 2월 30일은 없으므로 2월 28일/29일로 처리해야 함)
     const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
     const actualDay = Math.min(paymentDay, lastDayOfMonth);
@@ -88,7 +120,8 @@ export default function SubscriptionsPage() {
     const currentMonthSubs = subscriptions.map(sub => {
       // 데이터에 paymentDay가 없으면 원본 날짜에서 추출
       const day = sub.paymentDay || new Date(sub.originalNextPayment).getDate();
-      const paymentDate = getPaymentDateForView(day, currentDate);
+      const billingCycle = sub.billingCycle || 'monthly';
+      const paymentDate = getPaymentDateForView(day, currentDate, billingCycle, sub.originalNextPayment);
 
       return {
         ...sub,
@@ -98,8 +131,26 @@ export default function SubscriptionsPage() {
 
     // 2. 날짜 선택 여부에 따라 필터링
     if (selectedDate === null) {
-      // 월 보기: 이번 달 전체 리스트 반환
-      return currentMonthSubs.sort((a, b) => a.calculatedPaymentDate - b.calculatedPaymentDate);
+      // 월 보기: 현재 보고 있는 달에 결제일이 있는 구독만 반환
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth();
+      
+      return currentMonthSubs
+        .filter(sub => {
+          const paymentYear = sub.calculatedPaymentDate.getFullYear();
+          const paymentMonth = sub.calculatedPaymentDate.getMonth();
+          
+          // 연간 결제 주기인 경우, 원본 결제일의 월과 일이 현재 보고 있는 월과 일치하는지 확인
+          if (sub.billingCycle === 'yearly' && sub.originalNextPayment) {
+            const originalDate = new Date(sub.originalNextPayment);
+            return paymentYear === currentYear && paymentMonth === currentMonth && 
+                   paymentMonth === originalDate.getMonth();
+          }
+          
+          // 월간 결제 주기인 경우 기존 로직
+          return paymentYear === currentYear && paymentMonth === currentMonth;
+        })
+        .sort((a, b) => a.calculatedPaymentDate - b.calculatedPaymentDate);
     } else {
       // 일 보기: 선택한 날짜와 정확히 일치하는 구독만 반환
       return currentMonthSubs.filter(sub => {
@@ -158,6 +209,126 @@ export default function SubscriptionsPage() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    setIsLoggedIn(false);
+    router.push('/');
+  };
+
+  // 수정 모드 시작
+  const handleStartEdit = () => {
+    setIsEditMode(true);
+    setEditFormData({
+      name: selectedSubscription.serviceName,
+      price: selectedSubscription.monthlyPrice,
+      category: selectedSubscription.category,
+      billingCycle: selectedSubscription.billingCycle || 'monthly',
+      nextPaymentDate: selectedSubscription.originalNextPayment ? 
+        new Date(selectedSubscription.originalNextPayment).toISOString().split('T')[0] : '',
+      description: selectedSubscription.description || ''
+    });
+  };
+
+  // 수정 취소
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setEditFormData(null);
+  };
+
+  // 구독 정보 수정 저장
+  const handleSaveEdit = async () => {
+    if (!editFormData.name || !editFormData.price) {
+      alert('서비스명과 가격은 필수입니다.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/subscriptions/${selectedSubscription.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          name: editFormData.name,
+          price: parseFloat(editFormData.price),
+          category: editFormData.category || '기타',
+          billingCycle: editFormData.billingCycle || 'monthly',
+          nextPaymentDate: editFormData.nextPaymentDate || null,
+          description: editFormData.description || ''
+        })
+      });
+
+      const updatedData = await response.json();
+      
+      if (!response.ok) {
+        let errorMessage = `구독 수정에 실패했습니다. (status: ${response.status})`;
+        if (updatedData && updatedData.error) {
+          errorMessage = updatedData.error;
+        }
+        throw new Error(errorMessage);
+      }
+
+      // 수정 성공 시 목록 새로고침
+      try {
+        setIsLoading(true);
+        setError(null);
+        const refreshResponse = await subscriptionAPI.getSubscriptions();
+        const subscriptionsData = refreshResponse.subscriptions || refreshResponse || [];
+        
+        const transformedSubscriptions = subscriptionsData.map(sub => {
+          const nextPaymentDate = sub.next_payment_date || sub.nextPaymentDate;
+          const paymentDay = nextPaymentDate ? new Date(nextPaymentDate).getDate() : null;
+          
+          return {
+            id: sub.id,
+            serviceName: sub.name || sub.serviceName,
+            monthlyPrice: sub.price || sub.monthlyPrice,
+            paymentDay: paymentDay || sub.paymentDay,
+            originalNextPayment: nextPaymentDate || sub.originalNextPayment,
+            billingCycle: sub.billingCycle || 'monthly',
+            category: sub.category || '기타',
+            description: sub.description || '',
+            userId: sub.userId || null,
+            username: sub.username || null,
+          };
+        });
+        
+        setSubscriptions(transformedSubscriptions);
+      } catch (refreshErr) {
+        console.error('구독 목록 새로고침 오류:', refreshErr);
+      } finally {
+        setIsLoading(false);
+      }
+      
+      // 수정된 구독 정보로 업데이트
+      if (updatedData.subscription) {
+        const updatedSub = {
+          ...selectedSubscription,
+          serviceName: updatedData.subscription.name,
+          monthlyPrice: updatedData.subscription.price,
+          category: updatedData.subscription.category,
+          billingCycle: updatedData.subscription.billingCycle,
+          description: updatedData.subscription.description,
+          originalNextPayment: updatedData.subscription.nextPaymentDate || updatedData.subscription.next_payment_date
+        };
+        setSelectedSubscription(updatedSub);
+      }
+      
+      setIsEditMode(false);
+      setEditFormData(null);
+      alert('구독 정보가 수정되었습니다.');
+    } catch (err) {
+      console.error('구독 수정 오류:', err);
+      alert(err.message || '구독 수정 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleDeleteSubscription = async (id) => {
     const confirmed = window.confirm('정말로 이 구독을 삭제하시겠습니까?');
     if (!confirmed) return;
@@ -200,6 +371,18 @@ export default function SubscriptionsPage() {
     const year = date.getFullYear();
 
     return subscriptions.some(sub => {
+      const billingCycle = sub.billingCycle || 'monthly';
+      
+      // 연간 결제 주기인 경우
+      if (billingCycle === 'yearly' && sub.originalNextPayment) {
+        const originalDate = new Date(sub.originalNextPayment);
+        const originalMonth = originalDate.getMonth();
+        const originalDay = originalDate.getDate();
+        // 원본 결제일의 월과 일이 현재 날짜와 일치하는지 확인
+        return originalDay === day && originalMonth === month && year === currentDate.getFullYear();
+      }
+      
+      // 월간 결제 주기인 경우
       const pDay = sub.paymentDay || new Date(sub.originalNextPayment).getDate();
       // 현재 보고 있는 달의 해당 날짜와 결제일이 일치하는지 확인
       return pDay === day && month === currentDate.getMonth() && year === currentDate.getFullYear();
@@ -305,12 +488,70 @@ export default function SubscriptionsPage() {
 
           <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
             <a href="#" style={{ color: '#667eea', textDecoration: 'none', fontWeight: '600' }}>구독 조회</a>
-            <a href="#" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>AI 추천</a>
+            <Link href="/recommendations" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>AI 추천</Link>
           </div>
 
           <div style={{ display: 'flex', gap: '1rem' }}>
-            <button style={{ background: 'transparent', color: '#6b7280', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', fontWeight: '500', cursor: 'pointer' }}>로그인</button>
-            <button style={{ background: '#667eea', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', fontWeight: '500', cursor: 'pointer' }}>회원가입</button>
+            {isLoggedIn ? (
+              <>
+                <Link href="/profile" style={{
+                  background: '#667eea',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block'
+                }}>
+                  회원 정보 조회
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    background: 'transparent',
+                    color: '#6b7280',
+                    border: 'none',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '6px',
+                    fontWeight: '500',
+                    cursor: 'pointer'
+                  }}
+                >
+                  로그아웃
+                </button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" style={{
+                  background: 'transparent',
+                  color: '#6b7280',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block'
+                }}>
+                  로그인
+                </Link>
+                <Link href="/signup" style={{
+                  background: '#667eea',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  display: 'inline-block'
+                }}>
+                  회원가입
+                </Link>
+              </>
+            )}
           </div>
         </nav>
 
@@ -471,6 +712,11 @@ export default function SubscriptionsPage() {
                     displayedSubscriptions.map(sub => (
                         <div
                             key={sub.id}
+                            onClick={() => {
+                              setSelectedSubscription(sub);
+                              setIsEditMode(false);
+                              setEditFormData(null);
+                            }}
                             style={{
                               border: '1px solid #e5e7eb',
                               borderRadius: '8px',
@@ -478,7 +724,16 @@ export default function SubscriptionsPage() {
                               display: 'flex',
                               justifyContent: 'space-between',
                               alignItems: 'center',
-                              transition: 'all 0.2s'
+                              transition: 'all 0.2s',
+                              cursor: 'pointer'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#f9fafb';
+                              e.currentTarget.style.borderColor = '#667eea';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'white';
+                              e.currentTarget.style.borderColor = '#e5e7eb';
                             }}
                         >
                           <div>
@@ -544,6 +799,446 @@ export default function SubscriptionsPage() {
             </div>
           </div>
         </main>
+
+        {/* 구독 설명 모달 */}
+        {selectedSubscription && (
+          <div
+            onClick={() => setSelectedSubscription(null)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '2rem'
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'white',
+                borderRadius: '12px',
+                padding: '2rem',
+                maxWidth: '500px',
+                width: '100%',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1.5rem'
+              }}>
+                <h2 style={{
+                  fontSize: '1.5rem',
+                  fontWeight: 'bold',
+                  color: '#1f2937',
+                  margin: 0
+                }}>
+                  {isEditMode ? '구독 정보 수정' : selectedSubscription.serviceName}
+                </h2>
+                <button
+                  onClick={() => {
+                    setSelectedSubscription(null);
+                    setIsEditMode(false);
+                    setEditFormData(null);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    color: '#6b7280',
+                    cursor: 'pointer',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '4px',
+                    lineHeight: 1
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#f3f4f6';
+                    e.currentTarget.style.color = '#1f2937';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = '#6b7280';
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              {isEditMode && editFormData ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      서비스명 *
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.name}
+                      onChange={(e) => setEditFormData({...editFormData, name: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      가격 (원) *
+                    </label>
+                    <input
+                      type="number"
+                      value={editFormData.price}
+                      onChange={(e) => setEditFormData({...editFormData, price: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      카테고리
+                    </label>
+                    <select
+                      value={editFormData.category}
+                      onChange={(e) => setEditFormData({...editFormData, category: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    >
+                      <option value="스트리밍">스트리밍</option>
+                      <option value="음악">음악</option>
+                      <option value="소프트웨어">소프트웨어</option>
+                      <option value="게임">게임</option>
+                      <option value="클라우드">클라우드</option>
+                      <option value="뉴스/잡지">뉴스/잡지</option>
+                      <option value="피트니스">피트니스</option>
+                      <option value="교육">교육</option>
+                      <option value="기타">기타</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      결제 주기
+                    </label>
+                    <select
+                      value={editFormData.billingCycle}
+                      onChange={(e) => setEditFormData({...editFormData, billingCycle: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    >
+                      <option value="monthly">월간</option>
+                      <option value="yearly">연간</option>
+                      <option value="quarterly">분기</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      다음 결제일
+                    </label>
+                    <input
+                      type="date"
+                      value={editFormData.nextPaymentDate}
+                      onChange={(e) => setEditFormData({...editFormData, nextPaymentDate: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      설명
+                    </label>
+                    <textarea
+                      value={editFormData.description}
+                      onChange={(e) => setEditFormData({...editFormData, description: e.target.value})}
+                      placeholder="구독 서비스에 대한 추가 정보를 입력하세요"
+                      rows="4"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        fontFamily: 'inherit',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{
+                    marginTop: '1rem',
+                    paddingTop: '1rem',
+                    borderTop: '1px solid #e5e7eb',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '0.5rem'
+                  }}>
+                    <button
+                      onClick={handleCancelEdit}
+                      disabled={isSaving}
+                      style={{
+                        background: 'transparent',
+                        color: '#6b7280',
+                        border: '1px solid #d1d5db',
+                        padding: '0.75rem 1.5rem',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        cursor: isSaving ? 'not-allowed' : 'pointer',
+                        fontSize: '1rem',
+                        opacity: isSaving ? 0.5 : 1
+                      }}
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={handleSaveEdit}
+                      disabled={isSaving}
+                      style={{
+                        background: '#667eea',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.75rem 1.5rem',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        cursor: isSaving ? 'not-allowed' : 'pointer',
+                        fontSize: '1rem',
+                        opacity: isSaving ? 0.5 : 1
+                      }}
+                    >
+                      {isSaving ? '저장 중...' : '저장'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div style={{
+                    marginBottom: '1rem',
+                    padding: '1rem',
+                    background: '#f9fafb',
+                    borderRadius: '8px'
+                  }}>
+                    <div style={{
+                      fontSize: '0.875rem',
+                      color: '#6b7280',
+                      marginBottom: '0.5rem'
+                    }}>
+                      카테고리
+                    </div>
+                    <div style={{
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      color: '#1f2937'
+                    }}>
+                      {selectedSubscription.category}
+                    </div>
+                  </div>
+
+                  <div style={{
+                    marginBottom: '1rem',
+                    padding: '1rem',
+                    background: '#f9fafb',
+                    borderRadius: '8px'
+                  }}>
+                    <div style={{
+                      fontSize: '0.875rem',
+                      color: '#6b7280',
+                      marginBottom: '0.5rem'
+                    }}>
+                      월 구독료
+                    </div>
+                    <div style={{
+                      fontSize: '1.25rem',
+                      fontWeight: 'bold',
+                      color: '#667eea'
+                    }}>
+                      {formatCurrency(selectedSubscription.monthlyPrice || 0)}
+                    </div>
+                  </div>
+
+                  <div style={{
+                    marginBottom: '1rem',
+                    padding: '1rem',
+                    background: '#f9fafb',
+                    borderRadius: '8px'
+                  }}>
+                    <div style={{
+                      fontSize: '0.875rem',
+                      color: '#6b7280',
+                      marginBottom: '0.5rem'
+                    }}>
+                      결제 주기
+                    </div>
+                    <div style={{
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      color: '#1f2937'
+                    }}>
+                      {selectedSubscription.billingCycle === 'yearly' ? '연간' : 
+                       selectedSubscription.billingCycle === 'quarterly' ? '분기' : '월간'}
+                    </div>
+                  </div>
+
+                  {selectedSubscription.description ? (
+                    <div style={{
+                      marginBottom: '1rem'
+                    }}>
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: '#6b7280',
+                        marginBottom: '0.5rem',
+                        fontWeight: '500'
+                      }}>
+                        설명
+                      </div>
+                      <div style={{
+                        fontSize: '1rem',
+                        color: '#1f2937',
+                        lineHeight: '1.6',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word'
+                      }}>
+                        {selectedSubscription.description}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: '2rem',
+                      textAlign: 'center',
+                      color: '#9ca3af',
+                      fontSize: '0.875rem'
+                    }}>
+                      설명이 없습니다.
+                    </div>
+                  )}
+
+                  <div style={{
+                    marginTop: '1.5rem',
+                    paddingTop: '1rem',
+                    borderTop: '1px solid #e5e7eb',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '0.5rem'
+                  }}>
+                    <button
+                      onClick={handleStartEdit}
+                      style={{
+                        background: '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.75rem 1.5rem',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        fontSize: '1rem'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#059669';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#10b981';
+                      }}
+                    >
+                      수정
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedSubscription(null);
+                        setIsEditMode(false);
+                        setEditFormData(null);
+                      }}
+                      style={{
+                        background: '#667eea',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.75rem 1.5rem',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        fontSize: '1rem'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#5568d3';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#667eea';
+                      }}
+                    >
+                      닫기
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* 푸터 (기존 유지) */}
         <footer style={{ background: '#1f2937', color: 'white', padding: '3rem 2rem 2rem 2rem', marginTop: 'auto' }}>

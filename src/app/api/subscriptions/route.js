@@ -46,11 +46,34 @@ export async function GET(request) {
       
       // 구독 조회 페이지 형식에 맞게 데이터 변환
       const formattedSubscriptions = allSubscriptions.map(sub => {
-        // billingCycle 기반으로 다음 결제일 계산
+        // 다음 결제일 계산: 사용자가 설정한 nextPaymentDate를 우선 사용
         let nextPaymentDate = null;
-        if (sub.createdAt) {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        
+        // 1순위: 사용자가 직접 설정한 nextPaymentDate
+        if (sub.nextPaymentDate) {
+          const userSetDate = new Date(sub.nextPaymentDate);
+          userSetDate.setHours(0, 0, 0, 0);
+          
+          // 과거 날짜인 경우 다음 결제일 계산
+          if (userSetDate < now) {
+            if (sub.billingCycle === 'monthly') {
+              // 다음 달 같은 날짜
+              nextPaymentDate = new Date(userSetDate.getFullYear(), userSetDate.getMonth() + 1, userSetDate.getDate());
+            } else if (sub.billingCycle === 'yearly') {
+              // 다음 해 같은 날짜
+              nextPaymentDate = new Date(userSetDate.getFullYear() + 1, userSetDate.getMonth(), userSetDate.getDate());
+            } else {
+              // 기본값: 다음 달
+              nextPaymentDate = new Date(userSetDate.getFullYear(), userSetDate.getMonth() + 1, userSetDate.getDate());
+            }
+          } else {
+            nextPaymentDate = userSetDate;
+          }
+        } else if (sub.createdAt) {
+          // 2순위: createdAt 기반 계산 (하위 호환용)
           const createdDate = new Date(sub.createdAt);
-          const now = new Date();
           
           if (sub.billingCycle === 'monthly') {
             const paymentDay = createdDate.getDate();
@@ -97,11 +120,34 @@ export async function GET(request) {
     
     // 구독 조회 페이지 형식에 맞게 데이터 변환
     const formattedSubscriptions = subscriptions.map(sub => {
-      // billingCycle 기반으로 다음 결제일 계산
+      // 다음 결제일 계산: 사용자가 설정한 nextPaymentDate를 우선 사용
       let nextPaymentDate = null;
-      if (sub.createdAt) {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      
+      // 1순위: 사용자가 직접 설정한 nextPaymentDate
+      if (sub.nextPaymentDate) {
+        const userSetDate = new Date(sub.nextPaymentDate);
+        userSetDate.setHours(0, 0, 0, 0);
+        
+        // 과거 날짜인 경우 다음 결제일 계산
+        if (userSetDate < now) {
+          if (sub.billingCycle === 'monthly') {
+            // 다음 달 같은 날짜
+            nextPaymentDate = new Date(userSetDate.getFullYear(), userSetDate.getMonth() + 1, userSetDate.getDate());
+          } else if (sub.billingCycle === 'yearly') {
+            // 다음 해 같은 날짜
+            nextPaymentDate = new Date(userSetDate.getFullYear() + 1, userSetDate.getMonth(), userSetDate.getDate());
+          } else {
+            // 기본값: 다음 달
+            nextPaymentDate = new Date(userSetDate.getFullYear(), userSetDate.getMonth() + 1, userSetDate.getDate());
+          }
+        } else {
+          nextPaymentDate = userSetDate;
+        }
+      } else if (sub.createdAt) {
+        // 2순위: createdAt 기반 계산 (하위 호환용)
         const createdDate = new Date(sub.createdAt);
-        const now = new Date();
         
         if (sub.billingCycle === 'monthly') {
           // 매월 같은 날짜
@@ -136,7 +182,7 @@ export async function GET(request) {
           price: sub.price,
           billingCycle: sub.billingCycle || 'monthly',
           category: sub.category || '기타',
-          next_payment_date: sub.nextPaymentDate || (nextPaymentDate ? nextPaymentDate.toISOString().split('T')[0] : null),
+          next_payment_date: nextPaymentDate ? nextPaymentDate.toISOString().split('T')[0] : null,
           description: sub.description || '',
           userId: sub.userId, // 사용자 ID 포함
           username: username, // 사용자 이름 포함

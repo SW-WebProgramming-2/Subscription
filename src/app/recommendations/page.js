@@ -60,6 +60,14 @@ export default function RecommedPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [preferenceData, setPreferenceData] = useState(null);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+    // 로그인 상태 확인
+    useEffect(() => {
+        const token = localStorage.getItem('authToken');
+        const loggedIn = !!token;
+        setIsLoggedIn(loggedIn);
+    }, []);
 
     useEffect(() => {
         fetchRecommendationData();
@@ -208,6 +216,13 @@ export default function RecommedPage() {
         }
     };
 
+    const handleLogout = () => {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        setIsLoggedIn(false);
+        router.push('/');
+    };
+
     return (
         <div style={{
             minHeight: '100vh',
@@ -249,28 +264,66 @@ export default function RecommedPage() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem' }}>
-                    <button style={{
-                        background: 'transparent',
-                        color: '#6b7280',
-                        border: 'none',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '6px',
-                        fontWeight: '500',
-                        cursor: 'pointer'
-                    }}>
-                        로그인
-                    </button>
-                    <button style={{
-                        background: '#667eea',
-                        color: 'white',
-                        border: 'none',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '6px',
-                        fontWeight: '500',
-                        cursor: 'pointer'
-                    }}>
-                        회원가입
-                    </button>
+                    {isLoggedIn ? (
+                        <>
+                            <Link href="/profile" style={{
+                                background: '#667eea',
+                                color: 'white',
+                                border: 'none',
+                                padding: '0.5rem 1rem',
+                                borderRadius: '6px',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                textDecoration: 'none',
+                                display: 'inline-block'
+                            }}>
+                                회원 정보 조회
+                            </Link>
+                            <button
+                                onClick={handleLogout}
+                                style={{
+                                    background: 'transparent',
+                                    color: '#6b7280',
+                                    border: 'none',
+                                    padding: '0.5rem 1rem',
+                                    borderRadius: '6px',
+                                    fontWeight: '500',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                로그아웃
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <Link href="/login" style={{
+                                background: 'transparent',
+                                color: '#6b7280',
+                                border: 'none',
+                                padding: '0.5rem 1rem',
+                                borderRadius: '6px',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                textDecoration: 'none',
+                                display: 'inline-block'
+                            }}>
+                                로그인
+                            </Link>
+                            <Link href="/signup" style={{
+                                background: '#667eea',
+                                color: 'white',
+                                border: 'none',
+                                padding: '0.5rem 1rem',
+                                borderRadius: '6px',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                textDecoration: 'none',
+                                display: 'inline-block'
+                            }}>
+                                회원가입
+                            </Link>
+                        </>
+                    )}
                 </div>
             </nav>
 
