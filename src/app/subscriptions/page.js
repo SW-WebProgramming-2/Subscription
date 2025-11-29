@@ -353,7 +353,7 @@ export default function SubscriptionsPage() {
 
           <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
             <a href="#" style={{ color: '#667eea', textDecoration: 'none', fontWeight: '600' }}>구독 조회</a>
-            <a href="#" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>AI 추천</a>
+            <Link href="/recommendations" style={{ color: '#6b7280', textDecoration: 'none', fontWeight: '500' }}>AI 추천</Link>
           </div>
 
           <div style={{ display: 'flex', gap: '1rem' }}>
