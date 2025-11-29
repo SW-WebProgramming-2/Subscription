@@ -23,6 +23,8 @@ export default function ProfilePage() {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailSubject, setEmailSubject] = useState('');
   const [emailMessage, setEmailMessage] = useState('');
+  const [isSendingReminders, setIsSendingReminders] = useState(false);
+  const [reminderResult, setReminderResult] = useState(null);
 
   useEffect(() => {
     // 로그인 상태 확인
@@ -309,6 +311,40 @@ export default function ProfilePage() {
     }
   };
 
+  const handleSendPaymentReminders = async () => {
+    if (!confirm('결제 예정 알림을 발송하시겠습니까?\n결제일 하루 전인 모든 구독 서비스에 대해 이메일이 발송됩니다.')) {
+      return;
+    }
+
+    setIsSendingReminders(true);
+    setReminderResult(null);
+    
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/notifications/send-payment-reminders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setReminderResult(data);
+        alert(`결제 알림 발송 완료!\n확인: ${data.checked}개\n발송: ${data.notified}개\n실패: ${data.failed}개`);
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || '결제 알림 발송에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('결제 알림 발송 오류:', error);
+      alert('네트워크 오류가 발생했습니다.');
+    } finally {
+      setIsSendingReminders(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div style={{
@@ -433,10 +469,50 @@ export default function ProfilePage() {
               fontSize: '1.5rem',
               fontWeight: 'bold',
               color: '#1f2937',
-              marginBottom: '1.5rem'
+              marginBottom: '1rem'
             }}>
               전체 회원 목록
             </h2>
+
+            <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <button
+                onClick={handleSendPaymentReminders}
+                disabled={isSendingReminders}
+                style={{
+                  background: isSendingReminders ? '#9ca3af' : '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: isSendingReminders ? 'not-allowed' : 'pointer',
+                  alignSelf: 'flex-start',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                {isSendingReminders ? '⏳ 발송 중...' : '📧 결제 알림 수동 발송'}
+              </button>
+              {reminderResult && (
+                <div style={{
+                  padding: '1rem',
+                  background: '#f0f9ff',
+                  border: '1px solid #bae6fd',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  color: '#1f2937'
+                }}>
+                  <div style={{ fontWeight: '500', marginBottom: '0.5rem' }}>발송 결과:</div>
+                  <div>확인: {reminderResult.checked}개</div>
+                  <div>발송: {reminderResult.notified}개</div>
+                  {reminderResult.failed > 0 && (
+                    <div style={{ color: '#ef4444' }}>실패: {reminderResult.failed}개</div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {isLoadingUsers ? (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
